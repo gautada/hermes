@@ -77,6 +77,11 @@ RUN git clone --filter=blob:none "${HERMES_REPOSITORY}" . \
  && npm cache clean --force \
  && rm -rf /root/.cache /root/.npm .git
 
+# Override the base image's Debian version reporter with the application
+# version expected by the container version and health mechanisms.
+COPY usr/bin/container-version /usr/bin/container-version
+RUN chmod 0755 /usr/bin/container-version
+
 # The gautada/debian base runs s6 over /etc/services.d. Add Hermes as a
 # supervised service and keep the base image's crond service intact.
 RUN mkdir -p "${HERMES_HOME}" /etc/services.d/hermes \
