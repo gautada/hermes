@@ -1,0 +1,27 @@
+---
+name: Container CI/CD harness
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+concurrency:
+  group: container-harness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  container:
+    uses: gautada/cicd/.github/workflows/cicd-container.yaml@main
+    with:
+      cicd_ref: main
+    secrets:
+      DOCKERIO_REGISTRY: ${{ secrets.DOCKERIO_REGISTRY }}
+      DOCKERIO_TOKEN: ${{ secrets.DOCKERIO_TOKEN }}
