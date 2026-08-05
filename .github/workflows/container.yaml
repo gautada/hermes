@@ -1,66 +1,27 @@
 ---
-name: "Continuous Integration: Build and Publish Multi-Architecture Container Images"
-# This is the generic reusable template for building containers
+name: Container CI/CD harness
 
-'on':
-  workflow_dispatch: {}
-  push:
-    branches:
-      - dev
+on:
+  workflow_dispatch:
   pull_request:
-    branches:
-      - main
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
 
 permissions:
   contents: read
-  checks: write
-  statuses: write
+  pull-requests: write
   security-events: write
+
+concurrency:
+  group: container-harness-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  check:
-    uses: gautada/cicd/.github/workflows/ci-linter.yaml@main
-  deep-scan:
-    needs: check
-    uses: gautada/cicd/.github/workflows/ci-deep-scan.yaml@main
-  build-arm64:
-    needs: check
-    uses: gautada/cicd/.github/workflows/ci-podman-build.yaml@main
+  container:
+    uses: gautada/cicd/.github/workflows/cicd-container.yaml@main
     with:
-      architecture: "arm64"
+      cicd_ref: main
     secrets:
-      REGISTRY_USERNAME: ${{ secrets.DOCKERIO_REGISTRY }}
-      REGISTRY_TOKEN: ${{ secrets.DOCKERIO_TOKEN }}
-  build-amd64:
-    needs: check
-    uses: gautada/cicd/.github/workflows/ci-podman-build.yaml@main
-    with:
-      architecture: "amd64"
-    secrets:
-      REGISTRY_USERNAME: ${{ secrets.DOCKERIO_REGISTRY }}
-      REGISTRY_TOKEN: ${{ secrets.DOCKERIO_TOKEN }}
-  publish:
-    needs: [build-arm64, build-amd64]
-    uses: gautada/cicd/.github/workflows/ci-podman-publish.yaml@main
-    with:
-      architectures: '["arm64", "amd64"]'
-    secrets:
-      REGISTRY_USERNAME: ${{ secrets.DOCKERIO_REGISTRY }}
-      REGISTRY_TOKEN: ${{ secrets.DOCKERIO_TOKEN }}
-  clean:
-    needs: [publish]
-    uses: gautada/cicd/.github/workflows/ci-registry-clean.yaml@main
-    secrets:
-      REGISTRY_USERNAME: ${{ secrets.DOCKERIO_REGISTRY }}
-      REGISTRY_TOKEN: ${{ secrets.DOCKERIO_TOKEN }}
-  test:
-    needs: [clean]
-    uses: gautada/cicd/.github/workflows/ci-container-test.yaml@main
-    secrets:
-      REGISTRY_USERNAME: ${{ secrets.DOCKERIO_REGISTRY }}
-      REGISTRY_TOKEN: ${{ secrets.DOCKERIO_TOKEN }}
-  release:
-    needs: [test]
-    uses: gautada/cicd/.github/workflows/cd-tag-latest.yaml@main
-    secrets:
-      REGISTRY_USERNAME: ${{ secrets.DOCKERIO_REGISTRY }}
-      REGISTRY_TOKEN: ${{ secrets.DOCKERIO_TOKEN }}
+      DOCKERIO_REGISTRY: ${{ secrets.DOCKERIO_REGISTRY }}
+      DOCKERIO_TOKEN: ${{ secrets.DOCKERIO_TOKEN }}
