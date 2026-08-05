@@ -21,6 +21,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HERMES_WEB_DIST=/opt/hermes/hermes_cli/web_dist \
     HERMES_TUI_DIR=/opt/hermes/ui-tui \
     PLAYWRIGHT_BROWSERS_PATH=/opt/hermes/.playwright \
+    UV_PYTHON_INSTALL_DIR=/opt/hermes/.uv-python \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH=/opt/hermes/.venv/bin:/usr/local/bin:/usr/bin:/bin
