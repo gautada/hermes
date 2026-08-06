@@ -13,9 +13,11 @@ service and:
 hermes gateway run
 ```
 
-Hermes runs as the unprivileged `debian` user. Its configuration, credentials,
-sessions, skills, and other persistent state belong under
-`/mnt/volumes/data/hermes`.
+Hermes runs as the unprivileged `hermes` user (the base image's `debian` user,
+renamed — following the same pattern as other `gautada` containers). Its home
+directory, `/home/hermes/.hermes`, is symlinked to the volume mount point, so
+configuration, credentials, sessions, skills, and other persistent state
+belong under `/mnt/volumes/data`.
 
 ## Build
 
@@ -65,7 +67,7 @@ The gateway may restart until its initial configuration exists. Run the
 interactive setup as the image's unprivileged user:
 
 ```sh
-podman exec --interactive --tty --user debian hermes hermes setup
+podman exec --interactive --tty --user hermes hermes hermes setup
 ```
 
 Then restart the container so the supervised gateway reloads the completed
@@ -84,12 +86,9 @@ Avoid placing credentials in the image or committing them to this repository.
 ## Storage
 
 The named volume is mounted at `/mnt/volumes/data`, one of the persistent mount
-points provided by the base image. Hermes uses the following directory inside
-it:
-
-```text
-/mnt/volumes/data/hermes
-```
+points provided by the base image. It is symlinked to the `hermes` user's
+home directory (`/home/hermes/.hermes`), which is where Hermes stores its
+configuration, credentials, sessions, and skills by default.
 
 Back up this volume to retain configuration and agent state across container
 replacement. The base image also defines mount points for configuration,
@@ -132,10 +131,10 @@ Useful commands:
 podman logs --follow hermes
 
 # Check Hermes configuration and dependencies
-podman exec --interactive --tty --user debian hermes hermes doctor
+podman exec --interactive --tty --user hermes hermes hermes doctor
 
 # Open a shell as the Hermes runtime user
-podman exec --interactive --tty --user debian hermes zsh
+podman exec --interactive --tty --user hermes hermes zsh
 
 # Stop and remove the container without deleting persistent data
 podman stop hermes
