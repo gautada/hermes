@@ -188,7 +188,7 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
  && ln -s /usr/local/lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
 
 COPY --from=builder --chown=hermes:hermes /opt/hermes /opt/hermes
-RUN chown ${USER}:${USER} -r /opt/hermes /home/${USER} /mnt/volumes/data
+RUN chown ${USER}:${USER} -R /opt/hermes /home/${USER} /mnt/volumes/data
 
 # ╭――――――――――――――――――╮
 # │ VERSION          │
