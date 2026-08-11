@@ -188,7 +188,6 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
  && ln -s /usr/local/lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
 
 COPY --from=builder --chown=hermes:hermes /opt/hermes /opt/hermes
-RUN chown ${USER}:${USER} -R /opt/hermes /home/${USER} /mnt/volumes/data
 
 # ╭――――――――――――――――――╮
 # │ VERSION          │
@@ -216,8 +215,12 @@ RUN chmod 0755 /usr/bin/container-version
 COPY etc/services.d/hermes/run /etc/services.d/hermes/run
 RUN chmod 0755 /etc/services.d/hermes/run
 
+
+
 EXPOSE 8080/tcp 9119/tcp 8645/tcp
 WORKDIR /home/hermes/.hermes
+RUN chown ${USER}:${USER} -R /opt/hermes /home/${USER} /mnt/volumes/data
+
 
 # ENTRYPOINT is inherited from gautada/debian:
 # ["/usr/bin/s6-svscan", "/etc/services.d"]
