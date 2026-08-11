@@ -204,17 +204,18 @@ RUN chmod 0755 /usr/bin/container-version
 # symlinked to the volume mount point so persistent state (config, sessions,
 # skills) survives container replacement without baking the mount path into
 # the image.
-RUN mkdir -p /etc/services.d/hermes \
- && ln -s /mnt/volumes/data /home/hermes/.hermes \
- && chown -h hermes:hermes /home/hermes/.hermes \
- && printf '%s\n' \
-      '#!/bin/sh' \
-      'exec 2>&1' \
-      'exec s6-setuidgid hermes /opt/hermes/.venv/bin/hermes gateway run' \
-      > /etc/services.d/hermes/run \
- && chmod 0755 /etc/services.d/hermes/run
+# RUN mkdir -p /etc/services.d/hermes \
+#  && ln -s /mnt/volumes/data /home/hermes/.hermes \
+#  && chown -h hermes:hermes /home/hermes/.hermes \
+#  && printf '%s\n' \
+#       '#!/bin/sh' \
+#       'exec 2>&1' \
+#       'exec s6-setuidgid hermes /opt/hermes/.venv/bin/hermes gateway run' \
+#       > /etc/services.d/hermes/run \
+COPY etc/services.d/hermes/run /etc/services.d/hermes/run
+RUN chmod 0755 /etc/services.d/hermes/run
 
-EXPOSE 8080/tcp 9119/tcp
+EXPOSE 8080/tcp 9119/tcp 8645/tcp
 WORKDIR /home/hermes/.hermes
 
 # ENTRYPOINT is inherited from gautada/debian:

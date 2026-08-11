@@ -1,0 +1,6 @@
+#!/bin/sh
+USER="hermes"
+HOME="/home/${USER}"
+export HOME
+exec 2>&1
+exec s6-setuidgid hermes /opt/hermes/.venv/bin/hermes gateway run
