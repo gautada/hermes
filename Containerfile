@@ -124,6 +124,11 @@ RUN git clone --filter=blob:none "${HERMES_REPOSITORY}" . \
  && npm cache clean --force \
  && rm -rf /root/.cache /root/.npm .git /opt/hermes/ui-tui /opt/hermes/apps /opt/hermes/tests-js
 
+COPY patches ./
+# Dry run first — confirms it'll apply cleanly without touching anything
+RUN patch --dry-run -p1 < ./patches/bluebubbles_webhook_proxy.patch \
+ && patch -p1 < ./patches/bluebubbles_webhook_proxy.patch \
+ && rm -rf ./patches
 # ╭――――――――――――――――――――――――――――╮
 # │ FINAL                       │
 # ╰――――――――――――――――――――――――――――╯
@@ -179,14 +184,14 @@ ARG USER=hermes
 RUN /usr/sbin/usermod -l $USER monty \
  && /usr/sbin/usermod -d /home/$USER -m $USER \
  && /usr/sbin/groupmod -n $USER monty \
- && /bin/echo "$USER:$USER" | /usr/sbin/chpasswd
+ && /bin/echo "$USER:$USER" | /usr/sbin/chpasswd \
+ && ln -fsv /mnt/volumes/data /home/${USER}/.hermes
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
  && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
  && ln -s /usr/local/lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
-
 COPY --from=builder --chown=hermes:hermes /opt/hermes /opt/hermes
 
 # ╭――――――――――――――――――╮

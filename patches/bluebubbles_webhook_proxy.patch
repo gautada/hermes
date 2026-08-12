@@ -1,0 +1,11 @@
+--- a/gateway/platforms/bluebubbles.py
++++ b/gateway/platforms/bluebubbles.py
+@@ -339,6 +339,8 @@
+         host = self.webhook_host
+         if host in {"0.0.0.0", "127.0.0.1", "localhost", "::"}:
+             host = "localhost"
++        # Overload host if proxy is defined
++        host = os.getenv("BLUEBUBBLES_WEBHOOK_PROXY", host)
+         return f"http://{host}:{self.webhook_port}{self.webhook_path}"
+ 
+     @property
