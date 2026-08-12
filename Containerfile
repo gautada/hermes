@@ -124,11 +124,9 @@ RUN git clone --filter=blob:none "${HERMES_REPOSITORY}" . \
  && npm cache clean --force \
  && rm -rf /root/.cache /root/.npm .git /opt/hermes/ui-tui /opt/hermes/apps /opt/hermes/tests-js
 
-COPY patches ./
-# Dry run first — confirms it'll apply cleanly without touching anything
-RUN patch --dry-run -p1 < ./patches/bluebubbles_webhook_proxy.patch \
- && patch -p1 < ./patches/bluebubbles_webhook_proxy.patch \
- && rm -rf ./patches
+COPY patches/* /tmp/
+RUN patch -p1 -d /opt/hermes < /tmp/bluebubbles.patch
+
 # ╭――――――――――――――――――――――――――――╮
 # │ FINAL                       │
 # ╰――――――――――――――――――――――――――――╯
