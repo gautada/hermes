@@ -1,6 +1,8 @@
 #!/bin/sh
-USER="hermes"
-HOME="/home/${USER}"
+APP_USER="hermes"
+HOME="/home/${APP_USER}"
 export HOME
+HERMES_WRITE_SAFE_ROOT="${HOME}/.hermes"
+export HERMES_WRITE_SAFE_ROOT
 exec 2>&1
-exec s6-setuidgid hermes /opt/hermes/.venv/bin/hermes gateway run
+exec s6-setuidgid hermes /${HOME}/.local/bin/hermes gateway run

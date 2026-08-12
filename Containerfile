@@ -222,8 +222,10 @@ RUN chmod 0755 /etc/services.d/hermes/run
 
 EXPOSE 8080/tcp 9119/tcp 8645/tcp
 WORKDIR /home/hermes/.hermes
-RUN chown ${USER}:${USER} -R /opt/hermes /home/${USER} /mnt/volumes/data
-
+RUN mkdir -p /home/${USER}/.local/bin \
+ && ln -fsv /opt/hermes/.venv/hermes /home/${USER}/.local/bin/hermes \
+ && chown ${USER}:${USER} -R /opt/hermes /home/${USER} /mnt/volumes/data
+ENV PATH="/home/${USER}/.local/bin:${PATH}"
 
 # ENTRYPOINT is inherited from gautada/debian:
 # ["/usr/bin/s6-svscan", "/etc/services.d"]
