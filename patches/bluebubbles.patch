@@ -5,7 +5,12 @@
          if host in {"0.0.0.0", "127.0.0.1", "localhost", "::"}:
              host = "localhost"
 +        # Overload host if proxy is defined
-+        host = os.getenv("BLUEBUBBLES_WEBHOOK_PROXY", host)
-         return f"http://{host}:{self.webhook_port}{self.webhook_path}"
++        host = os.getenv("BLUEBUBBLES_WEBHOOK_PROXY_HOST", host)
++        port = os.getenv("BLUEBUBBLES_WEBHOOK_PROXY_PORT", self.webhook_port)
+-        return f"http://{host}:{self.webhook_port}{self.webhook_path}"
++        # return f"http://{host}:{self.webhook_port}{self.webhook_path}"
++        return f"http://{host}:{port}{self.webhook_path}"
+
+
  
      @property
