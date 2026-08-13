@@ -1,13 +1,16 @@
-@@ -339,7 +339,11 @@
+--- ./bluebubbles.py	2026-08-12 20:00:21
++++ bluebubbles.py~	2026-08-12 21:18:26
+@@ -339,7 +339,12 @@
          host = self.webhook_host
          if host in {"0.0.0.0", "127.0.0.1", "localhost", "::"}:
              host = "localhost"
 -        return f"http://{host}:{self.webhook_port}{self.webhook_path}"
-+        # Overload host if proxy is defined
-+        host = os.getenv("BLUEBUBBLES_WEBHOOK_PROXY_HOST", host)
-+        port = os.getenv("BLUEBUBBLES_WEBHOOK_PROXY_PORT", self.webhook_port)
-+        # return f"http://{host}:{self.webhook_port}{self.webhook_path}"
-+        return f"http://{host}:{port}{self.webhook_path}"
++         # return f"http://{host}:{self.webhook_port}{self.webhook_path}"
++         # Overload host if proxy is defined
++        url = f"http://{host}:{self.webhook_port}{self.webhook_path}"
++        url = os.getenv("BLUEBUBBLES_WEBHOOK_PROXY_URL", urli)
++        url = "{url}{self.webhook_path}"
++        return url
  
      @property
      def _webhook_register_url(self) -> str:
