@@ -125,7 +125,7 @@ RUN git clone --filter=blob:none "${HERMES_REPOSITORY}" . \
  && rm -rf /root/.cache /root/.npm .git /opt/hermes/ui-tui /opt/hermes/apps /opt/hermes/tests-js
 
 COPY patches/* /tmp/
-RUN patch -p1 -d /opt/hermes < /tmp/bluebubbles.patch
+RUN patch -p1 -d /opt/hermes/gateway/platforms/bluebubbles.py < /tmp/bluebubbles.patch
 
 # ╭――――――――――――――――――――――――――――╮
 # │ FINAL                       │
