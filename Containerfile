@@ -94,6 +94,7 @@ RUN apt-get -o Acquire::Retries=3 update \
       python3 \
       python3-dev \
       python3-venv \
+      sqlite3 \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
