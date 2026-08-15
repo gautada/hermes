@@ -36,7 +36,7 @@ kubectl cp scripts ai/<pod-name>:/tmp/hermes-recovery-scripts
 You have (at least) two recovered databases from this incident:
 
 | file | method | sessions | messages |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `recovered-state.db` | SQL rowid-bisection (`hermes sessions recover --allow-partial`) | 31 (20 real) | 3,069 |
 | `recovered-state-v2.db` | page-level `sqlite3 .recover` salvage | 31 (21 real) | 3,070 |
 
@@ -211,6 +211,6 @@ python3 ./scripts/07_diff_recovered_dbs.py \
 - `verification.warnings` vs `.errors` — warnings are acknowledged, expected
   loss under `--allow-partial`; errors mean don't install this output.
 
-i## Quick recovery
+## Quick recovery
 
 `./scripts/01_cutover.sh --recovered /mnt/volumes/data/recovered-state-v2.db`
