@@ -9,7 +9,7 @@
 +         # Overload host if proxy is defined
 +        url = f"http://{host}:{self.webhook_port}{self.webhook_path}"
 +        url = os.getenv("BLUEBUBBLES_WEBHOOK_PROXY_URL", url)
-+        url = "{url}{self.webhook_path}"
++        url = f"{url}{self.webhook_path}"
 +        return url
  
      @property
