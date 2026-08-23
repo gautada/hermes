@@ -94,7 +94,7 @@ RUN apt-get -o Acquire::Retries=3 update \
       python3 \
       python3-dev \
       python3-venv \
-      sqlite3 dnsutils \
+      sqlite3 dnsutils gh \
  && apt-get -o Acquire::Retries=3 upgrade --yes \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
