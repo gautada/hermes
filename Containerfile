@@ -11,7 +11,7 @@ FROM ${NODE_IMAGE} AS node
 FROM ${BASE_IMAGE} AS builder
 
 ARG HERMES_REPOSITORY=https://github.com/nousresearch/hermes-agent.git
-ARG HERMES_REF=main
+ARG HERMES_REF=v2026.08.19
 
 # ╭――――――――――――――――――――――――――――╮
 # │ NETWORK DIAGNOSTIC          │
