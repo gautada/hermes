@@ -94,6 +94,8 @@ RUN apt-get -o Acquire::Retries=3 update \
       python3 \
       python3-dev \
       python3-venv \
+      sqlite3 dnsutils gh \
+ && apt-get -o Acquire::Retries=3 upgrade --yes \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
@@ -123,6 +125,9 @@ RUN git clone --filter=blob:none "${HERMES_REPOSITORY}" . \
  && npm --prefix web run build \
  && npm cache clean --force \
  && rm -rf /root/.cache /root/.npm .git /opt/hermes/ui-tui /opt/hermes/apps /opt/hermes/tests-js
+
+COPY patches/* /tmp/
+RUN patch -p1 /opt/hermes/gateway/platforms/bluebubbles.py < /tmp/bluebubbles.patch
 
 # ╭――――――――――――――――――――――――――――╮
 # │ FINAL                       │
@@ -179,14 +184,14 @@ ARG USER=hermes
 RUN /usr/sbin/usermod -l $USER monty \
  && /usr/sbin/usermod -d /home/$USER -m $USER \
  && /usr/sbin/groupmod -n $USER monty \
- && /bin/echo "$USER:$USER" | /usr/sbin/chpasswd
+ && /bin/echo "$USER:$USER" | /usr/sbin/chpasswd \
+ && ln -fsv /mnt/volumes/data /home/${USER}/.hermes
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
  && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
  && ln -s /usr/local/lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
-
 COPY --from=builder --chown=hermes:hermes /opt/hermes /opt/hermes
 
 # ╭――――――――――――――――――╮
@@ -204,18 +209,25 @@ RUN chmod 0755 /usr/bin/container-version
 # symlinked to the volume mount point so persistent state (config, sessions,
 # skills) survives container replacement without baking the mount path into
 # the image.
-RUN mkdir -p /etc/services.d/hermes \
- && ln -s /mnt/volumes/data /home/hermes/.hermes \
- && chown -h hermes:hermes /home/hermes/.hermes \
- && printf '%s\n' \
-      '#!/bin/sh' \
-      'exec 2>&1' \
-      'exec s6-setuidgid hermes /opt/hermes/.venv/bin/hermes gateway run' \
-      > /etc/services.d/hermes/run \
- && chmod 0755 /etc/services.d/hermes/run
+# RUN mkdir -p /etc/services.d/hermes \
+#  && ln -s /mnt/volumes/data /home/hermes/.hermes \
+#  && chown -h hermes:hermes /home/hermes/.hermes \
+#  && printf '%s\n' \
+#       '#!/bin/sh' \
+#       'exec 2>&1' \
+#       'exec s6-setuidgid hermes /opt/hermes/.venv/bin/hermes gateway run' \
+#       > /etc/services.d/hermes/run \
+COPY etc/services.d/hermes/run /etc/services.d/hermes/run
+RUN chmod 0755 /etc/services.d/hermes/run
 
-EXPOSE 8080/tcp 9119/tcp
+
+
+EXPOSE 8080/tcp 9119/tcp 8645/tcp
 WORKDIR /home/hermes/.hermes
+RUN mkdir -p /home/${USER}/.local/bin \
+ && ln -fsv /opt/hermes/.venv/bin/hermes /home/${USER}/.local/bin/hermes \
+ && chown ${USER}:${USER} -R /opt/hermes /home/${USER} /mnt/volumes/data
+ENV PATH="/home/${USER}/.local/bin:${PATH}"
 
 # ENTRYPOINT is inherited from gautada/debian:
 # ["/usr/bin/s6-svscan", "/etc/services.d"]
