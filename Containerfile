@@ -220,6 +220,7 @@ RUN chmod 0755 /usr/bin/container-version
 COPY etc/services.d/hermes/run /etc/services.d/hermes/run
 RUN chmod 0755 /etc/services.d/hermes/run
 
+COPY etc/crontab /etc/crontab
 COPY _local/bin/backup /home/hermes/.local/bin/backup
 COPY _local/bin/restore /home/hermes/.local/bin/restore
 
