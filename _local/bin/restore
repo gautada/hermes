@@ -12,13 +12,31 @@ USER=hermes
 HOME=/home/${USER}
 DB_FILE=state.db
 DB_PATH=${HOME}/${DB_FILE}
+BASE=/mnt/volumes/data
+DB_BASE=${BASE}/${DB_FILE}
 
-if [ -f "${DB_PATH}" ]; then
+# Create the symlink if it doesn't already exist
+if [ ! -e "$$DB_BASE" ]; then
+    ln -fsv "${DB_PATH}" "${DB_BASE}"
+fi
+
+if [ -f "$DB_PATH" ]; then
  echo "ERROR: File already exists: ${DB_PATH}" >&2
  exit 1
+fi
+
+if [ ! -L "$DB_BASE" ]; then
+    echo "Error: expected symlink not found: ${DB_BASE}" >&2
+    exit 2
 fi
 
 # echo "$latest"
 /usr/bin/gunzip -c "$latest" > ${DB_PATH}
 chown ${USER}:${USER} ${DB_PATH}
-sqlite3 ${DB_PATH} 'PRAGMA integrity_check;'
+# /usr/bin/sqlite3 ${DB_PATH} 'PRAGMA integrity_check;'
+
+# if [ $? -ne 0 ]; then
+if ! /usr/bin/sqlite3 ${DB_PATH} 'PRAGMA integrity_check;' ; then
+    echo "Error: sqlite3 integrity check failed" >&2
+    exit 3
+fi
