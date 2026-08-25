@@ -220,6 +220,8 @@ RUN chmod 0755 /usr/bin/container-version
 COPY etc/services.d/hermes/run /etc/services.d/hermes/run
 RUN chmod 0755 /etc/services.d/hermes/run
 
+COPY _local/bin/backup /home/hermes/.local/bin/backup
+COPY _local/bin/restore /home/hermes/.local/bin/restore
 
 
 EXPOSE 8080/tcp 9119/tcp 8645/tcp
