@@ -94,7 +94,6 @@ RUN apt-get -o Acquire::Retries=3 update \
       python3 \
       python3-dev \
       python3-venv \
-      sqlite3 dnsutils gh \
  && apt-get -o Acquire::Retries=3 upgrade --yes \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
@@ -172,6 +171,11 @@ RUN apt-get -o Acquire::Retries=3 update \
       procps \
       ripgrep \
       zlib1g \
+      sqlite3 \
+      gh \
+      dnsutils \
+      podman \
+      kubectl \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
@@ -220,6 +224,9 @@ RUN chmod 0755 /usr/bin/container-version
 COPY etc/services.d/hermes/run /etc/services.d/hermes/run
 RUN chmod 0755 /etc/services.d/hermes/run
 
+COPY etc/crontab /etc/crontab
+COPY _local/bin/backup /home/hermes/.local/bin/backup
+COPY _local/bin/restore /home/hermes/.local/bin/restore
 
 
 EXPOSE 8080/tcp 9119/tcp 8645/tcp

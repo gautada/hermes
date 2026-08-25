@@ -1,0 +1,24 @@
+#!/bin/sh
+
+latest=$(
+	find /mnt/volumes/backup/database -maxdepth 1 -type f \
+   -printf '%T@ %p\n' |
+   sort -nr |
+   head -n 1 |
+   cut -d' ' -f2-
+)
+
+USER=hermes
+HOME=/home/${USER}
+DB_FILE=state.db
+DB_PATH=${HOME}/${DB_FILE}
+
+if [ -f "${DB_PATH}" ]; then
+ echo "ERROR: File already exists: ${DB_PATH}" >&2
+ exit 1
+fi
+
+# echo "$latest"
+/usr/bin/gunzip -c "$latest" > ${DB_PATH}
+chown ${USER}:${USER} ${DB_PATH}
+sqlite3 ${DB_PATH} 'PRAGMA integrity_check;'
