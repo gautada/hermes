@@ -1,16 +1,13 @@
---- ./bluebubbles.py	2026-08-12 20:00:21
-+++ bluebubbles.py~	2026-08-12 21:40:32
-@@ -339,7 +339,12 @@
-         host = self.webhook_host
-         if host in {"0.0.0.0", "127.0.0.1", "localhost", "::"}:
-             host = "localhost"
+--- a/hermes-agent/gateway/platforms/bluebubbles.py
++++ b/hermes-agent/gateway/platforms/bluebubbles.py
+@@ -255,7 +255,9 @@
+     def _webhook_url(self) -> str:
+         """External webhook URL for BlueBubbles registration (local binds → localhost)."""
+         host = "localhost" if self.webhook_host in _LOCAL_HOSTS else self.webhook_host
 -        return f"http://{host}:{self.webhook_port}{self.webhook_path}"
-+         # return f"http://{host}:{self.webhook_port}{self.webhook_path}"
-+         # Overload host if proxy is defined
-+        url = f"http://{host}:{self.webhook_port}{self.webhook_path}"
-+        url = os.getenv("BLUEBUBBLES_WEBHOOK_PROXY_URL", url)
-+        url = f"{url}{self.webhook_path}"
-+        return url
++        # Allow a reverse proxy / tunnel URL to override host:port; path is always appended once.
++        base = os.getenv("BLUEBUBBLES_WEBHOOK_PROXY_URL", f"http://{host}:{self.webhook_port}")
++        return f"{base}{self.webhook_path}"
  
-     @property
-     def _webhook_register_url(self) -> str:
+     def _webhook_register_url_with(self, password_param: str) -> str:
+         return f"{self._webhook_url}?password={password_param}" if self.password else self._webhook_url
