@@ -108,8 +108,9 @@ WORKDIR /opt/hermes
 
 # HERMES_REF may be a branch, tag, or commit. Pin it to a commit or release tag
 # in production so rebuilds are reproducible.
-RUN git clone --filter=blob:none "${HERMES_REPOSITORY}" . \
- && git checkout "${HERMES_REF}" \
+# RUN git clone --filter=blob:none "${HERMES_REPOSITORY}" . \
+# && git checkout "${HERMES_REF}" \
+RUN git clone --branch ${HERMES_REF} ${HERMES_REPOSITORY} . \
  && git submodule update --init --recursive \
  && uv sync --frozen --no-install-project \
       --extra all \
