@@ -1,4 +1,5 @@
 ARG NODE_VERSION=24.20.0
+
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:latest
 FROM ${UV_IMAGE} AS uv
 
@@ -18,7 +19,6 @@ RUN apt-get update \
       python3 \
       python3-dev \
       python3-venv \
-      python3-uv \
  && apt-get upgrade --yes \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
