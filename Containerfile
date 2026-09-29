@@ -40,6 +40,20 @@ COPY --from=uv /uv /uvx /usr/local/bin/
 WORKDIR /opt
 RUN git clone --branch "v${HERMES_VERSION}" "${HERMES_REPOSITORY}" hermes
 WORKDIR /opt/hermes
+# RUN git submodule update --init --recursive \
+#  && uv sync --frozen --no-install-project \
+#       --extra all \
+#       --extra messaging \
+#       --extra anthropic \
+#       --extra bedrock \
+#       --extra azure-identity \
+#       --extra hindsight \
+#       --extra matrix \
+#  && uv pip install --no-cache-dir --no-deps -e . \
+#  && npm install --prefer-offline --no-audit --workspace=web \
+#  && npm --prefix web run build \
+#  && npm cache clean --force \
+#  && rm -rf /root/.cache /root/.npm .git /opt/hermes/ui-tui /opt/hermes/apps /opt/hermes/tests-js
 RUN git submodule update --init --recursive \
  && uv sync --frozen --no-install-project \
       --extra all \
@@ -47,14 +61,13 @@ RUN git submodule update --init --recursive \
       --extra anthropic \
       --extra bedrock \
       --extra azure-identity \
-      --extra hindsight \
       --extra matrix \
  && uv pip install --no-cache-dir --no-deps -e . \
  && npm install --prefer-offline --no-audit --workspace=web \
  && npm --prefix web run build \
  && npm cache clean --force \
- && rm -rf /root/.cache /root/.npm .git /opt/hermes/ui-tui /opt/hermes/apps /opt/hermes/tests-js
-
+ && rm -rf /root/.cache /root/.npm .git \
+      /opt/hermes/ui-tui /opt/hermes/apps /opt/hermes/tests-js
 # COPY patches/* /tmp/
 # RUN patch -p1 /opt/hermes/gateway/platforms/bluebubbles.py < /tmp/bluebubbles.patch
 
