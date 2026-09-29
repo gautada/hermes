@@ -56,18 +56,31 @@ WORKDIR /opt/hermes
 #  && rm -rf /root/.cache /root/.npm .git /opt/hermes/ui-tui /opt/hermes/apps /opt/hermes/tests-js
 RUN git submodule update --init --recursive \
  && uv sync --frozen --no-install-project \
-      --extra all \
-      --extra messaging \
-      --extra anthropic \
-      --extra bedrock \
-      --extra azure-identity \
-      --extra matrix \
+       --extra all --extra messaging --extra anthropic \
+       --extra matrix \
  && uv pip install --no-cache-dir --no-deps -e . \
  && npm install --prefer-offline --no-audit --workspace=web \
  && npm --prefix web run build \
  && npm cache clean --force \
  && rm -rf /root/.cache /root/.npm .git \
       /opt/hermes/ui-tui /opt/hermes/apps /opt/hermes/tests-js
+
+# There are several other useful optional extras, but I would only bake them
+# into your container if you actually intend to use them:
+# - exa, firecrawl, parallel-web, ddgs — web-search backends.
+# - fal — image generation.
+# - edge-tts — Edge text-to-speech.
+# - discord, telegram, slack, dingtalk, feishu — individual messaging backends.
+# - vertex — Google Vertex authentication.
+# - google — Gmail, Calendar, Drive, Docs, Sheets support.
+# - youtube — YouTube transcript functionality.
+# - computer-use — MCP/httpx/Starlette stack for computer-use functionality.
+# - langfuse / otlp — observability/telemetry.
+#       --extra bedrock \
+#       --extra azure-identity \
+#       --extra hindsight \
+#
+#
 # COPY patches/* /tmp/
 # RUN patch -p1 /opt/hermes/gateway/platforms/bluebubbles.py < /tmp/bluebubbles.patch
 
