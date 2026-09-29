@@ -1,5 +1,7 @@
-ARG NODE_VERSION=24.20.0
+ARG UV_IMAGE=ghcr.io/astral-sh/uv:latest
+FROM ${UV_IMAGE} AS uv
 
+ARG NODE_VERSION=24.20.0
 FROM docker.io/gautada/node:${NODE_VERSION} as build
 ARG HERMES_REPOSITORY=https://github.com/nousresearch/hermes-agent.git
 ARG HERMES_VERSION=main
@@ -16,9 +18,18 @@ RUN apt-get update \
       python3 \
       python3-dev \
       python3-venv \
+      python3-uv \
  && apt-get upgrade --yes \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
+# ╭――――――――――――――――――╮
+# │ UV               │
+# ╰――――――――――――――――――╯
+# uv is the one dependency manager this image is opinionated about. It ships
+# as a single static binary, so pulling it in costs almost nothing in image
+# size and needs no compiler toolchain.
+COPY --from=uv /uv /uvx /usr/local/bin/
+
 
 # COPY --from=node /usr/local/bin/node /usr/local/bin/node
 # COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
