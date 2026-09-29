@@ -1,7 +1,7 @@
+ARG NODE_VERSION=24.20.0
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:latest
 FROM ${UV_IMAGE} AS uv
 
-ARG NODE_VERSION=24.20.0
 FROM docker.io/gautada/node:${NODE_VERSION} as build
 ARG HERMES_REPOSITORY=https://github.com/nousresearch/hermes-agent.git
 ARG HERMES_VERSION=main
