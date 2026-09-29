@@ -27,7 +27,7 @@ RUN apt-get update \
 #  && ln -s /usr/local/lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
 
 WORKDIR /opt
-RUN git clone --branch "${HERMES_VERSION}" "${HERMES_REPOSITORY}" hermes
+RUN git clone --branch "v${HERMES_VERSION}" "${HERMES_REPOSITORY}" hermes
 WORKDIR /opt/hermes
 RUN git submodule update --init --recursive \
  && uv sync --frozen --no-install-project \
