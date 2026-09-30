@@ -4,8 +4,6 @@ ARG UV_IMAGE=ghcr.io/astral-sh/uv:latest
 FROM ${UV_IMAGE} AS uv
 
 FROM docker.io/gautada/node:${NODE_VERSION} as build
-ARG HERMES_REPOSITORY=https://github.com/nousresearch/hermes-agent.git
-ARG HERMES_VERSION=main
 
 RUN apt-get update \
  && apt-get install --yes --no-install-recommends \
@@ -31,30 +29,11 @@ RUN apt-get update \
 # size and needs no compiler toolchain.
 COPY --from=uv /uv /uvx /usr/local/bin/
 
-
-# COPY --from=node /usr/local/bin/node /usr/local/bin/node
-# COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
-# RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
-#  && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
-#  && ln -s /usr/local/lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
-
+ARG HERMES_REPOSITORY=https://github.com/nousresearch/hermes-agent.git
+ARG HERMES_VERSION=main
 WORKDIR /opt
 RUN git clone --branch "v${HERMES_VERSION}" "${HERMES_REPOSITORY}" hermes
 WORKDIR /opt/hermes
-# RUN git submodule update --init --recursive \
-#  && uv sync --frozen --no-install-project \
-#       --extra all \
-#       --extra messaging \
-#       --extra anthropic \
-#       --extra bedrock \
-#       --extra azure-identity \
-#       --extra hindsight \
-#       --extra matrix \
-#  && uv pip install --no-cache-dir --no-deps -e . \
-#  && npm install --prefer-offline --no-audit --workspace=web \
-#  && npm --prefix web run build \
-#  && npm cache clean --force \
-#  && rm -rf /root/.cache /root/.npm .git /opt/hermes/ui-tui /opt/hermes/apps /opt/hermes/tests-js
 RUN git submodule update --init --recursive \
  && uv sync --frozen --no-install-project \
        --extra all --extra messaging --extra anthropic \
@@ -63,27 +42,9 @@ RUN git submodule update --init --recursive \
  && npm install --prefer-offline --no-audit --workspace=web \
  && npm --prefix web run build \
  && npm cache clean --force \
- && rm -rf /root/.cache /root/.npm .git \
-      /opt/hermes/ui-tui /opt/hermes/apps /opt/hermes/tests-js
-
-# There are several other useful optional extras, but I would only bake them
-# into your container if you actually intend to use them:
-# - exa, firecrawl, parallel-web, ddgs — web-search backends.
-# - fal — image generation.
-# - edge-tts — Edge text-to-speech.
-# - discord, telegram, slack, dingtalk, feishu — individual messaging backends.
-# - vertex — Google Vertex authentication.
-# - google — Gmail, Calendar, Drive, Docs, Sheets support.
-# - youtube — YouTube transcript functionality.
-# - computer-use — MCP/httpx/Starlette stack for computer-use functionality.
-# - langfuse / otlp — observability/telemetry.
-#       --extra bedrock \
-#       --extra azure-identity \
-#       --extra hindsight \
-#
-#
-# COPY patches/* /tmp/
-# RUN patch -p1 /opt/hermes/gateway/platforms/bluebubbles.py < /tmp/bluebubbles.patch
+ && rm -rf .cache .npm .git /opt/hermes/tests-js
+ #     /opt/hermes/ui-tui \
+ #      /opt/hermes/apps
 
 # ╭――――――――――――――――――――――――――――╮
 # │ FINAL                       │
@@ -165,8 +126,10 @@ RUN chmod 0755 /usr/bin/container-version
 # #       'exec 2>&1' \
 # #       'exec s6-setuidgid hermes /opt/hermes/.venv/bin/hermes gateway run' \
 # #       > /etc/services.d/hermes/run \
-# COPY etc/services.d/hermes/run /etc/services.d/hermes/run
-# RUN chmod 0755 /etc/services.d/hermes/run
+COPY etc/services.d/hermes/run /etc/services.d/hermes/run
+RUN chmod 0755 /etc/services.d/hermes/run
+
+
 #
 # COPY etc/crontab /etc/crontab
 # COPY _local/bin/backup /home/hermes/.local/bin/backup
@@ -174,11 +137,17 @@ RUN chmod 0755 /usr/bin/container-version
 #
 #
 # EXPOSE 8080/tcp 9119/tcp 8645/tcp
-# WORKDIR /home/hermes/.hermes
-# RUN mkdir -p /home/${USER}/.local/bin \
-#  && ln -fsv /opt/hermes/.venv/bin/hermes /home/${USER}/.local/bin/hermes \
-#  && chown ${USER}:${USER} -R /opt/hermes /home/${USER} /mnt/volumes/data
-# ENV PATH="/home/${USER}/.local/bin:${PATH}"
+WORKDIR /home/hermes/.hermes
+RUN mkdir -p /home/${USER}/.local/bin \
+ && ln -fsv /opt/hermes/.venv/bin/hermes /home/${USER}/.local/bin/hermes \
+ && chown ${USER}:${USER} -R /opt/hermes /home/${USER} /mnt/volumes/data
+ENV PATH="/home/${USER}/.local/bin:${PATH}"
+
+EXPOSE 8080
+WORKDIR /home/heremes
+
+
+
 #
 # # ENTRYPOINT is inherited from gautada/debian:
 # # ["/usr/bin/s6-svscan", "/etc/services.d"]
