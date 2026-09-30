@@ -1,5 +1,5 @@
 ARG NODE_VERSION=24.20.0
-
+ARG PYTHON_VERSION=3.13
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:latest
 FROM ${UV_IMAGE} AS uv
 
