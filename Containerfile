@@ -117,7 +117,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # no dev headers, no system Python — the copied .venv brings its own
 # self-contained interpreter.
 RUN apt-get update \
- && apt-getinstall --yes --no-install-recommends \
+ && apt-get install --yes --no-install-recommends \
       ffmpeg procps ripgrep zlib1g  sqlite3 \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
