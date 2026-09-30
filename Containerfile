@@ -47,7 +47,7 @@ RUN git submodule update --init --recursive \
  #      /opt/hermes/apps
 
 # ╭――――――――――――――――――――――――――――╮
-# │ FINAL                       │
+# │ FINAL                      │
 # ╰――――――――――――――――――――――――――――╯
 # Only what a running headless Hermes gateway + web dashboard actually needs.
 # No compilers, no dev headers — building C/Python/JS code on request is
@@ -112,43 +112,17 @@ COPY --from=build --chown=hermes:hermes /opt/hermes /opt/hermes
 COPY usr/bin/container-version /usr/bin/container-version
 RUN chmod 0755 /usr/bin/container-version
 
-# # The gautada/debian base runs s6 over /etc/services.d. Add Hermes as a
-# # supervised service and keep the base image's crond service intact.
-# # HERMES_HOME is intentionally left unset — Hermes defaults to ~/.hermes,
-# # which for the hermes user resolves to /home/hermes/.hermes. That path is
-# # symlinked to the volume mount point so persistent state (config, sessions,
-# # skills) survives container replacement without baking the mount path into
-# # the image.
-# # RUN mkdir -p /etc/services.d/hermes \
-# #  && ln -s /mnt/volumes/data /home/hermes/.hermes \
-# #  && chown -h hermes:hermes /home/hermes/.hermes \
-# #  && printf '%s\n' \
-# #       '#!/bin/sh' \
-# #       'exec 2>&1' \
-# #       'exec s6-setuidgid hermes /opt/hermes/.venv/bin/hermes gateway run' \
-# #       > /etc/services.d/hermes/run \
+# ╭――――――――――――――――――╮
+# │ SERVICE          │
+# ╰――――――――――――――――――╯
 COPY etc/services.d/hermes/run /etc/services.d/hermes/run
 RUN chmod 0755 /etc/services.d/hermes/run
 
-
-#
-# COPY etc/crontab /etc/crontab
-# COPY _local/bin/backup /home/hermes/.local/bin/backup
-# COPY _local/bin/restore /home/hermes/.local/bin/restore
-#
-#
 # EXPOSE 8080/tcp 9119/tcp 8645/tcp
 WORKDIR /home/hermes/.hermes
 RUN mkdir -p /home/${USER}/.local/bin \
  && ln -fsv /opt/hermes/.venv/bin/hermes /home/${USER}/.local/bin/hermes \
  && chown ${USER}:${USER} -R /opt/hermes /home/${USER} /mnt/volumes/data
 ENV PATH="/home/${USER}/.local/bin:${PATH}"
-
 EXPOSE 8080
 WORKDIR /home/heremes
-
-
-
-#
-# # ENTRYPOINT is inherited from gautada/debian:
-# # ["/usr/bin/s6-svscan", "/etc/services.d"]
