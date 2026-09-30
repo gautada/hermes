@@ -92,7 +92,7 @@ RUN git submodule update --init --recursive \
 # No compilers, no dev headers — building C/Python/JS code on request is
 # delegated to on-demand podman/docker build environments via the docker
 # tool, not baked into this always-on image.
-FROM docker.io/gautada/debian:${PYTHON_VERSION} as final
+FROM docker.io/gautada/python:${PYTHON_VERSION} as final
 
 LABEL org.opencontainers.image.title="hermes"
 LABEL org.opencontainers.image.description="Hermes Agent on the gautada Debian base image"
