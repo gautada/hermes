@@ -1,3 +1,4 @@
+ARG DEBIAN_VERSION=13.7
 ARG NODE_VERSION=24.20.0
 ARG PYTHON_VERSION=3.13
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:latest
@@ -56,7 +57,7 @@ RUN git submodule update --init --recursive \
 # No compilers, no dev headers — building C/Python/JS code on request is
 # delegated to on-demand podman/docker build environments via the docker
 # tool, not baked into this always-on image.
-FROM docker.io/gautada/debian:13.7 as final
+FROM docker.io/gautada/debian:${DEBIAN_VERSION} as final
 
 LABEL org.opencontainers.image.title="hermes"
 LABEL org.opencontainers.image.description="Hermes Agent on the gautada Debian base image"
