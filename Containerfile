@@ -5,6 +5,8 @@ FROM ${UV_IMAGE} AS uv
 
 FROM docker.io/gautada/node:${NODE_VERSION} as build
 
+ENV UV_PYTHON_INSTALL_DIR=/opt/python
+
 RUN apt-get update \
  && apt-get install --yes --no-install-recommends \
       build-essential \
@@ -35,7 +37,8 @@ WORKDIR /opt
 RUN git clone --branch "v${HERMES_VERSION}" "${HERMES_REPOSITORY}" hermes
 WORKDIR /opt/hermes
 RUN git submodule update --init --recursive \
- && uv sync --frozen --no-install-project \
+ && uv python install 3.14 \
+ && uv sync --frozen --no-install-project --python 3.14 \
        --extra all --extra messaging --extra anthropic \
        --extra matrix \
  && uv pip install --no-cache-dir --no-deps -e . \
@@ -53,7 +56,7 @@ RUN git submodule update --init --recursive \
 # No compilers, no dev headers — building C/Python/JS code on request is
 # delegated to on-demand podman/docker build environments via the docker
 # tool, not baked into this always-on image.
-FROM docker.io/gautada/python:${PYTHON_VERSION} as final
+FROM docker.io/gautada/debian:13.7 as final
 
 LABEL org.opencontainers.image.title="hermes"
 LABEL org.opencontainers.image.description="Hermes Agent on the gautada Debian base image"
@@ -102,6 +105,8 @@ COPY --from=build /usr/lib/node_modules /usr/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/bin/npm \
  && ln -s /usr/lib/node_modules/npm/bin/npx-cli.js /usr/bin/npx \
  && ln -s /usr/lib/node_modules/corepack/dist/corepack.js /usr/bin/corepack
+COPY --from=build /opt/python /opt/python
+COPY --from=build --chown=hermes:hermes /opt/hermes /opt/hermes
 COPY --from=build --chown=hermes:hermes /opt/hermes /opt/hermes
 
 # ╭――――――――――――――――――╮
