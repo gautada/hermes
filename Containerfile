@@ -1,6 +1,5 @@
 ARG DEBIAN_VERSION=13.7
 ARG NODE_VERSION=24.20.0
-ARG PYTHON_VERSION=3.13
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:latest
 FROM ${UV_IMAGE} AS uv
 
@@ -37,6 +36,7 @@ ARG HERMES_VERSION=main
 WORKDIR /opt
 RUN git clone --branch "v${HERMES_VERSION}" "${HERMES_REPOSITORY}" hermes
 WORKDIR /opt/hermes
+ARG PYTHON_VERSION=3.13
 RUN git submodule update --init --recursive \
  && uv python install "${PYTHON_VERSION}" \
  && uv sync --frozen --no-install-project --python "${PYTHON_VERSION}" \
