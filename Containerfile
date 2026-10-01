@@ -37,8 +37,8 @@ WORKDIR /opt
 RUN git clone --branch "v${HERMES_VERSION}" "${HERMES_REPOSITORY}" hermes
 WORKDIR /opt/hermes
 RUN git submodule update --init --recursive \
- && uv python install 3.14 \
- && uv sync --frozen --no-install-project --python 3.14 \
+ && uv python install "${PYTHON_VERSION}" \
+ && uv sync --frozen --no-install-project --python "${PYTHON_VERSION}" \
        --extra all --extra messaging --extra anthropic \
        --extra matrix \
  && uv pip install --no-cache-dir --no-deps -e . \
@@ -108,6 +108,9 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/bin/npm \
 COPY --from=build /opt/python /opt/python
 COPY --from=build --chown=hermes:hermes /opt/hermes /opt/hermes
 COPY --from=build --chown=hermes:hermes /opt/hermes /opt/hermes
+# Protect that everything is working
+RUN /opt/hermes/.venv/bin/python --version \
+ && /opt/hermes/.venv/bin/hermes --help >/dev/null
 
 # ╭――――――――――――――――――╮
 # │ VERSION          │
@@ -130,4 +133,4 @@ RUN mkdir -p /home/${USER}/.local/bin \
  && chown ${USER}:${USER} -R /opt/hermes /home/${USER} /mnt/volumes/data
 ENV PATH="/home/${USER}/.local/bin:${PATH}"
 EXPOSE 8080
-WORKDIR /home/heremes
+WORKDIR /home/hermes
