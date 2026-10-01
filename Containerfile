@@ -93,7 +93,7 @@ RUN apt-get update \
 # ╰――――――――――――――――――――╯
 # Rename the base debian user to hermes. Follows the same pattern as other
 # gautada containers (e.g. gautada/homepage).
-ARG OLDUSER=monty
+ARG OLDUSER=debian
 ARG USER=hermes
 RUN /usr/sbin/usermod -l $USER $OLDUSER \
  && /usr/sbin/usermod -d /home/$USER -m $USER \
