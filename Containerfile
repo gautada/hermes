@@ -84,7 +84,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update \
  && apt-get --yes --no-install-recommends upgrade \
  && apt-get install --yes --no-install-recommends \
-      ffmpeg procps ripgrep zlib1g  sqlite3 \
+      ffmpeg procps ripgrep zlib1g git jq sqlite3 \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 

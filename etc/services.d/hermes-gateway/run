@@ -1,16 +1,11 @@
 #!/bin/sh
 exec 2>&1
-APP_USER="hermes"
+
+APP_USER=$(id -nu 1000)
 HOME="/home/${APP_USER}"
 export HOME
+
 HERMES_WRITE_SAFE_ROOT="${HOME}/.hermes"
 export HERMES_WRITE_SAFE_ROOT
 
-# # ${HOME}/.local/bin/restore
-# # if [ $? -ne 0 ]; then
-# if ! ${HOME}/.local/bin/restore ; then
-#  echo "Error: some_command failed" >&2
-#  tail -f /dev/null
-# fi
-
-exec s6-setuidgid hermes /opt/hermes/.venv/bin/hermes gateway run
+exec s6-setuidgid "${APP_USER}" /opt/hermes/.venv/bin/hermes gateway run
