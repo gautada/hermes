@@ -103,9 +103,9 @@ RUN /usr/sbin/usermod -l $USER $OLDUSER \
 
 COPY --from=build /usr/bin/node /usr/bin/node
 COPY --from=build /usr/lib/node_modules /usr/lib/node_modules
-RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/bin/npm \
- && ln -s /usr/lib/node_modules/npm/bin/npx-cli.js /usr/bin/npx \
- && ln -s /usr/lib/node_modules/corepack/dist/corepack.js /usr/bin/corepack
+# RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/bin/npm \
+#  && ln -s /usr/lib/node_modules/npm/bin/npx-cli.js /usr/bin/npx \
+#  && ln -s /usr/lib/node_modules/corepack/dist/corepack.js /usr/bin/corepack
 COPY --from=build /opt/python /opt/python
 COPY --from=build --chown=hermes:hermes /opt/hermes /opt/hermes
 COPY --from=build --chown=hermes:hermes /opt/hermes /opt/hermes
