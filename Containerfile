@@ -1,11 +1,11 @@
+ARG DEBIAN_VERSION=13.7
 ARG NODE_VERSION=24.20.0
-ARG PYTHON_VERSION=3.13
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:latest
 FROM ${UV_IMAGE} AS uv
 
 FROM docker.io/gautada/node:${NODE_VERSION} as build
-ARG HERMES_REPOSITORY=https://github.com/nousresearch/hermes-agent.git
-ARG HERMES_VERSION=main
+
+ENV UV_PYTHON_INSTALL_DIR=/opt/python
 
 RUN apt-get update \
  && apt-get install --yes --no-install-recommends \
@@ -31,68 +31,33 @@ RUN apt-get update \
 # size and needs no compiler toolchain.
 COPY --from=uv /uv /uvx /usr/local/bin/
 
-
-# COPY --from=node /usr/local/bin/node /usr/local/bin/node
-# COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
-# RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
-#  && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
-#  && ln -s /usr/local/lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
-
+ARG HERMES_REPOSITORY=https://github.com/nousresearch/hermes-agent.git
+ARG HERMES_VERSION=main
 WORKDIR /opt
 RUN git clone --branch "v${HERMES_VERSION}" "${HERMES_REPOSITORY}" hermes
 WORKDIR /opt/hermes
-# RUN git submodule update --init --recursive \
-#  && uv sync --frozen --no-install-project \
-#       --extra all \
-#       --extra messaging \
-#       --extra anthropic \
-#       --extra bedrock \
-#       --extra azure-identity \
-#       --extra hindsight \
-#       --extra matrix \
-#  && uv pip install --no-cache-dir --no-deps -e . \
-#  && npm install --prefer-offline --no-audit --workspace=web \
-#  && npm --prefix web run build \
-#  && npm cache clean --force \
-#  && rm -rf /root/.cache /root/.npm .git /opt/hermes/ui-tui /opt/hermes/apps /opt/hermes/tests-js
+ARG PYTHON_VERSION=3.13
 RUN git submodule update --init --recursive \
- && uv sync --frozen --no-install-project \
+ && uv python install "${PYTHON_VERSION}" \
+ && uv sync --frozen --no-install-project --python "${PYTHON_VERSION}" \
        --extra all --extra messaging --extra anthropic \
        --extra matrix \
  && uv pip install --no-cache-dir --no-deps -e . \
  && npm install --prefer-offline --no-audit --workspace=web \
  && npm --prefix web run build \
  && npm cache clean --force \
- && rm -rf /root/.cache /root/.npm .git \
-      /opt/hermes/ui-tui /opt/hermes/apps /opt/hermes/tests-js
-
-# There are several other useful optional extras, but I would only bake them
-# into your container if you actually intend to use them:
-# - exa, firecrawl, parallel-web, ddgs — web-search backends.
-# - fal — image generation.
-# - edge-tts — Edge text-to-speech.
-# - discord, telegram, slack, dingtalk, feishu — individual messaging backends.
-# - vertex — Google Vertex authentication.
-# - google — Gmail, Calendar, Drive, Docs, Sheets support.
-# - youtube — YouTube transcript functionality.
-# - computer-use — MCP/httpx/Starlette stack for computer-use functionality.
-# - langfuse / otlp — observability/telemetry.
-#       --extra bedrock \
-#       --extra azure-identity \
-#       --extra hindsight \
-#
-#
-# COPY patches/* /tmp/
-# RUN patch -p1 /opt/hermes/gateway/platforms/bluebubbles.py < /tmp/bluebubbles.patch
+ && rm -rf .cache .npm .git /opt/hermes/tests-js
+ #     /opt/hermes/ui-tui \
+ #      /opt/hermes/apps
 
 # ╭――――――――――――――――――――――――――――╮
-# │ FINAL                       │
+# │ FINAL                      │
 # ╰――――――――――――――――――――――――――――╯
 # Only what a running headless Hermes gateway + web dashboard actually needs.
 # No compilers, no dev headers — building C/Python/JS code on request is
 # delegated to on-demand podman/docker build environments via the docker
 # tool, not baked into this always-on image.
-FROM docker.io/gautada/python:${PYTHON_VERSION} as final
+FROM docker.io/gautada/node:${NODE_VERSION} as final
 
 LABEL org.opencontainers.image.title="hermes"
 LABEL org.opencontainers.image.description="Hermes Agent on the gautada Debian base image"
@@ -117,6 +82,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # no dev headers, no system Python — the copied .venv brings its own
 # self-contained interpreter.
 RUN apt-get update \
+ && apt-get --yes --no-install-recommends upgrade \
  && apt-get install --yes --no-install-recommends \
       ffmpeg procps ripgrep zlib1g  sqlite3 \
  && apt-get clean \
@@ -127,7 +93,7 @@ RUN apt-get update \
 # ╰――――――――――――――――――――╯
 # Rename the base debian user to hermes. Follows the same pattern as other
 # gautada containers (e.g. gautada/homepage).
-ARG OLDUSER=monty
+ARG OLDUSER=ryan
 ARG USER=hermes
 RUN /usr/sbin/usermod -l $USER $OLDUSER \
  && /usr/sbin/usermod -d /home/$USER -m $USER \
@@ -137,10 +103,15 @@ RUN /usr/sbin/usermod -l $USER $OLDUSER \
 
 COPY --from=build /usr/bin/node /usr/bin/node
 COPY --from=build /usr/lib/node_modules /usr/lib/node_modules
-RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/bin/npm \
- && ln -s /usr/lib/node_modules/npm/bin/npx-cli.js /usr/bin/npx \
- && ln -s /usr/lib/node_modules/corepack/dist/corepack.js /usr/bin/corepack
+# RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/bin/npm \
+#  && ln -s /usr/lib/node_modules/npm/bin/npx-cli.js /usr/bin/npx \
+#  && ln -s /usr/lib/node_modules/corepack/dist/corepack.js /usr/bin/corepack
+COPY --from=build /opt/python /opt/python
 COPY --from=build --chown=hermes:hermes /opt/hermes /opt/hermes
+COPY --from=build --chown=hermes:hermes /opt/hermes /opt/hermes
+# Protect that everything is working
+RUN /opt/hermes/.venv/bin/python --version \
+ && /opt/hermes/.venv/bin/hermes --help >/dev/null
 
 # ╭――――――――――――――――――╮
 # │ VERSION          │
@@ -150,35 +121,19 @@ COPY --from=build --chown=hermes:hermes /opt/hermes /opt/hermes
 COPY usr/bin/container-version /usr/bin/container-version
 RUN chmod 0755 /usr/bin/container-version
 
-# # The gautada/debian base runs s6 over /etc/services.d. Add Hermes as a
-# # supervised service and keep the base image's crond service intact.
-# # HERMES_HOME is intentionally left unset — Hermes defaults to ~/.hermes,
-# # which for the hermes user resolves to /home/hermes/.hermes. That path is
-# # symlinked to the volume mount point so persistent state (config, sessions,
-# # skills) survives container replacement without baking the mount path into
-# # the image.
-# # RUN mkdir -p /etc/services.d/hermes \
-# #  && ln -s /mnt/volumes/data /home/hermes/.hermes \
-# #  && chown -h hermes:hermes /home/hermes/.hermes \
-# #  && printf '%s\n' \
-# #       '#!/bin/sh' \
-# #       'exec 2>&1' \
-# #       'exec s6-setuidgid hermes /opt/hermes/.venv/bin/hermes gateway run' \
-# #       > /etc/services.d/hermes/run \
-# COPY etc/services.d/hermes/run /etc/services.d/hermes/run
-# RUN chmod 0755 /etc/services.d/hermes/run
-#
-# COPY etc/crontab /etc/crontab
-# COPY _local/bin/backup /home/hermes/.local/bin/backup
-# COPY _local/bin/restore /home/hermes/.local/bin/restore
-#
-#
+# ╭――――――――――――――――――╮
+# │ SERVICE          │
+# ╰――――――――――――――――――╯
+COPY etc/services.d/hermes-gateway/run /etc/services.d/hermes-gateway/run
+RUN chmod 0755 /etc/services.d/hermes-gateway/run
+COPY etc/services.d/hermes-dashboard/run /etc/services.d/hermes-dashboard/run
+RUN chmod 0755 /etc/services.d/hermes-dashboard/run
+
 # EXPOSE 8080/tcp 9119/tcp 8645/tcp
-# WORKDIR /home/hermes/.hermes
-# RUN mkdir -p /home/${USER}/.local/bin \
-#  && ln -fsv /opt/hermes/.venv/bin/hermes /home/${USER}/.local/bin/hermes \
-#  && chown ${USER}:${USER} -R /opt/hermes /home/${USER} /mnt/volumes/data
-# ENV PATH="/home/${USER}/.local/bin:${PATH}"
-#
-# # ENTRYPOINT is inherited from gautada/debian:
-# # ["/usr/bin/s6-svscan", "/etc/services.d"]
+WORKDIR /home/hermes/.hermes
+RUN mkdir -p /home/${USER}/.local/bin \
+ && ln -fsv /opt/hermes/.venv/bin/hermes /home/${USER}/.local/bin/hermes \
+ && chown ${USER}:${USER} -R /opt/hermes /home/${USER} /mnt/volumes/data
+ENV PATH="/home/${USER}/.local/bin:${PATH}"
+EXPOSE 8080
+WORKDIR /home/hermes

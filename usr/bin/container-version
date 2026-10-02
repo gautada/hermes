@@ -2,7 +2,7 @@
 
 # Print only the installed Hermes Agent version for container health checks and
 # release verification.
-# exec /opt/hermes/.venv/bin/python -c \
-#   'from hermes_cli import __version__; print(__version__)'
+exec /opt/hermes/.venv/bin/python -c \
+  'from hermes_cli import __version__; print(__version__)'
 
-echo "1.1.1"
+# echo "1.1.1"
