@@ -57,7 +57,7 @@ RUN git submodule update --init --recursive \
 # No compilers, no dev headers — building C/Python/JS code on request is
 # delegated to on-demand podman/docker build environments via the docker
 # tool, not baked into this always-on image.
-FROM docker.io/gautada/debian:${DEBIAN_VERSION} as final
+FROM docker.io/gautada/node:${NODE_VERSION} as final
 
 LABEL org.opencontainers.image.title="hermes"
 LABEL org.opencontainers.image.description="Hermes Agent on the gautada Debian base image"
@@ -93,7 +93,7 @@ RUN apt-get update \
 # ╰――――――――――――――――――――╯
 # Rename the base debian user to hermes. Follows the same pattern as other
 # gautada containers (e.g. gautada/homepage).
-ARG OLDUSER=debian
+ARG OLDUSER=ryan
 ARG USER=hermes
 RUN /usr/sbin/usermod -l $USER $OLDUSER \
  && /usr/sbin/usermod -d /home/$USER -m $USER \
@@ -124,8 +124,10 @@ RUN chmod 0755 /usr/bin/container-version
 # ╭――――――――――――――――――╮
 # │ SERVICE          │
 # ╰――――――――――――――――――╯
-COPY etc/services.d/hermes/run /etc/services.d/hermes/run
-RUN chmod 0755 /etc/services.d/hermes/run
+COPY etc/services.d/hermes-gateway/run /etc/services.d/hermes-gateway/run
+RUN chmod 0755 /etc/services.d/hermes-gateway/run
+COPY etc/services.d/hermes-dashboard/run /etc/services.d/hermes-dashboard/run
+RUN chmod 0755 /etc/services.d/hermes-dashboard/run
 
 # EXPOSE 8080/tcp 9119/tcp 8645/tcp
 WORKDIR /home/hermes/.hermes
