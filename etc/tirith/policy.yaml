@@ -1,0 +1,20 @@
+# Default tirith policy for Hermes agents with Paperclip integration.
+# Placed at $HERMES_HOME/tirith/policy.yaml, symlinked to
+# ~/.config/tirith/policy.yaml by the agent bootstrap hook.
+schema_version: 2
+fail_mode: open
+allow_bypass_env: true
+allow_bypass_env_noninteractive: false
+paranoia: 1
+severity_overrides:
+  # Tirith cannot resolve $(cat ...) subshell expansions and reports
+  # analysis_incomplete at HIGH — blocking even allowlisted destinations.
+  # Downgrade to info so curl commands with inline key reads work in
+  # unattended (Paperclip heartbeat) mode.
+  analysis_incomplete: info
+additional_known_domains: []
+allowlist: []
+blocklist: []
+approval_rules: []
+network_deny: []
+network_allow: []
