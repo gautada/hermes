@@ -89,11 +89,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "15";\nAcquire::https::Timeout "15";\n' \
       > /etc/apt/apt.conf.d/99-retry \
  && apt-get update \
+ && apt-get --yes --no-install-recommends upgrade \
  && apt-get install --yes --no-install-recommends \
       procps ripgrep zlib1g git jq sqlite3 \
  && apt-get clean \
- && rm -rf /var/lib/apt/lists/* /usr/share/man /usr/share/doc
-# I removed ffmpeg
+ && rm -rf /var/lib/apt/lists/*
+# ATG removed ffmpeg
 
 # ╭――――――――――――――――――――╮
 # │ USER               │
