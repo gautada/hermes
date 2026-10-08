@@ -7,7 +7,9 @@ FROM docker.io/gautada/node:${NODE_VERSION} as build
 
 ENV UV_PYTHON_INSTALL_DIR=/opt/python
 
-RUN apt-get update \
+RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "15";\nAcquire::https::Timeout "15";\n' \
+      > /etc/apt/apt.conf.d/99-retry \
+ && apt-get update \
  && apt-get install --yes --no-install-recommends \
       build-essential \
       cmake \
@@ -84,12 +86,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # zlib1g (dynamically linked by Pillow's vendored image codecs). No compiler,
 # no dev headers, no system Python — the copied .venv brings its own
 # self-contained interpreter.
-RUN apt-get update \
- && apt-get --yes --no-install-recommends upgrade \
+RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "15";\nAcquire::https::Timeout "15";\n' \
+      > /etc/apt/apt.conf.d/99-retry \
+ && apt-get update \
  && apt-get install --yes --no-install-recommends \
-      ffmpeg procps ripgrep zlib1g git jq sqlite3 \
+      procps ripgrep zlib1g git jq sqlite3 \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* /usr/share/man /usr/share/doc
+# I removed ffmpeg
 
 # ╭――――――――――――――――――――╮
 # │ USER               │
