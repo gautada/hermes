@@ -7,7 +7,9 @@ FROM docker.io/gautada/node:${NODE_VERSION} as build
 
 ENV UV_PYTHON_INSTALL_DIR=/opt/python
 
-RUN apt-get update \
+RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "15";\nAcquire::https::Timeout "15";\n' \
+      > /etc/apt/apt.conf.d/99-retry \
+ && apt-get update \
  && apt-get install --yes --no-install-recommends \
       build-essential \
       cmake \
@@ -46,9 +48,12 @@ RUN git submodule update --init --recursive \
  && npm install --prefer-offline --no-audit --workspace=web \
  && npm --prefix web run build \
  && npm cache clean --force \
- && rm -rf .cache .npm .git /opt/hermes/tests-js
- #     /opt/hermes/ui-tui \
- #      /opt/hermes/apps
+ && rm -rf .cache .npm .git /opt/hermes/tests-js \
+ && rm -rf /opt/hermes/web/node_modules /opt/hermes/tests /opt/hermes/docs \
+ && (find /opt/python /opt/hermes/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true) \
+ && (find /opt/python /opt/hermes/.venv -type d \( -name tests -o -name test \) -exec rm -rf {} + 2>/dev/null || true) \
+ && (find /opt/python /opt/hermes/.venv -name "*.pyc" -delete 2>/dev/null || true) \
+ && (find /opt/python /opt/hermes/.venv -name "*.pyi" -delete 2>/dev/null || true)
 
 # ╭――――――――――――――――――――――――――――╮
 # │ FINAL                      │
@@ -57,7 +62,7 @@ RUN git submodule update --init --recursive \
 # No compilers, no dev headers — building C/Python/JS code on request is
 # delegated to on-demand podman/docker build environments via the docker
 # tool, not baked into this always-on image.
-FROM docker.io/gautada/node:${NODE_VERSION} as final
+FROM docker.io/gautada/debian:${DEBIAN_VERSION} as final
 
 LABEL org.opencontainers.image.title="hermes"
 LABEL org.opencontainers.image.description="Hermes Agent on the gautada Debian base image"
@@ -81,19 +86,22 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # zlib1g (dynamically linked by Pillow's vendored image codecs). No compiler,
 # no dev headers, no system Python — the copied .venv brings its own
 # self-contained interpreter.
-RUN apt-get update \
+RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "15";\nAcquire::https::Timeout "15";\n' \
+      > /etc/apt/apt.conf.d/99-retry \
+ && apt-get update \
  && apt-get --yes --no-install-recommends upgrade \
  && apt-get install --yes --no-install-recommends \
-      ffmpeg procps ripgrep zlib1g git jq sqlite3 \
+      procps ripgrep zlib1g git jq sqlite3 \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
+# ATG removed ffmpeg
 
 # ╭――――――――――――――――――――╮
 # │ USER               │
 # ╰――――――――――――――――――――╯
 # Rename the base debian user to hermes. Follows the same pattern as other
 # gautada containers (e.g. gautada/homepage).
-ARG OLDUSER=ryan
+ARG OLDUSER=debian
 ARG USER=hermes
 RUN /usr/sbin/usermod -l $USER $OLDUSER \
  && /usr/sbin/usermod -d /home/$USER -m $USER \
@@ -102,12 +110,11 @@ RUN /usr/sbin/usermod -l $USER $OLDUSER \
  && ln -fsv /mnt/volumes/data /home/${USER}/.hermes
 
 COPY --from=build /usr/bin/node /usr/bin/node
-COPY --from=build /usr/lib/node_modules /usr/lib/node_modules
+COPY --from=build /usr/lib/node_modules/npm /usr/lib/node_modules/npm
 # RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/bin/npm \
 #  && ln -s /usr/lib/node_modules/npm/bin/npx-cli.js /usr/bin/npx \
 #  && ln -s /usr/lib/node_modules/corepack/dist/corepack.js /usr/bin/corepack
 COPY --from=build /opt/python /opt/python
-COPY --from=build --chown=hermes:hermes /opt/hermes /opt/hermes
 COPY --from=build --chown=hermes:hermes /opt/hermes /opt/hermes
 # Protect that everything is working
 RUN /opt/hermes/.venv/bin/python --version \
