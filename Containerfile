@@ -109,6 +109,36 @@ RUN /usr/sbin/usermod -l $USER $OLDUSER \
  && /bin/echo "$USER:$USER" | /usr/sbin/chpasswd \
  && ln -fsv /mnt/volumes/data /home/${USER}/.hermes
 
+
+# ╭――――――――――――――――――╮
+# │ TIRITH           │
+# ╰――――――――――――――――――╯
+# Terminal security tool — intercepts and analyzes shell commands before
+# execution. Installed to /usr/local/bin so the Hermes default
+# `tirith_path: tirith` resolves it on PATH. No downstream agent needs
+# any configuration to inherit a working, policied tirith.
+#
+# Source: https://github.com/sheeki03/tirith (canonical per https://tirith.sh)
+# Pinned version with checksum verification.
+ARG TIRITH_VERSION=0.4.2
+RUN set -e; \
+    ARCH="$(dpkg --print-architecture)"; \
+    case "$ARCH" in \
+      amd64)  TRIPLE="x86_64-unknown-linux-gnu" \
+              SHA256="efa6bf414a83dba385d4f13137e8677f850ced9102fe74ebb14c72f31df0dc77" ;; \
+      arm64)  TRIPLE="aarch64-unknown-linux-gnu" \
+              SHA256="c550b1bfb0c8c872ab3421cd6ef756f260f7cf4981a18cedd49f141fa2d77569" ;; \
+      *)      echo "Unsupported architecture: $ARCH" >&2; exit 1 ;; \
+    esac; \
+    TARBALL="tirith-${TRIPLE}.tar.gz"; \
+    URL="https://github.com/sheeki03/tirith/releases/download/v${TIRITH_VERSION}/${TARBALL}"; \
+    curl -fsSL -o "/tmp/${TARBALL}" "$URL"; \
+    echo "${SHA256}  /tmp/${TARBALL}" | sha256sum -c -; \
+    tar -xzf "/tmp/${TARBALL}" -C /tmp; \
+    install -m 0755 /tmp/tirith /usr/local/bin/tirith; \
+    install -m 0755 /tmp/tirith-package-approval-authority /usr/local/bin/tirith-package-approval-authority; \
+    rm -rf /tmp/tirith /tmp/tirith-package-approval-authority /tmp/"${TARBALL}" /tmp/completions /tmp/man /tmp/README* /tmp/LICENSE*
+
 COPY --from=build /usr/bin/node /usr/bin/node
 COPY --from=build /usr/lib/node_modules/npm /usr/lib/node_modules/npm
 # RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/bin/npm \
@@ -118,7 +148,8 @@ COPY --from=build /opt/python /opt/python
 COPY --from=build --chown=hermes:hermes /opt/hermes /opt/hermes
 # Protect that everything is working
 RUN /opt/hermes/.venv/bin/python --version \
- && /opt/hermes/.venv/bin/hermes --help >/dev/null
+ && /opt/hermes/.venv/bin/hermes --help >/dev/null \
+ && tirith --version
 
 # ╭――――――――――――――――――╮
 # │ VERSION          │
@@ -139,14 +170,23 @@ RUN chmod 0755 /etc/services.d/hermes-dashboard/run
 # ╭――――――――――――――――――╮
 # │ PAPERCLIP        │
 # ╰――――――――――――――――――╯
-# Paperclip API wrapper and default tirith security policy for agent
-# coordination. pcp-api.sh handles both heartbeat (env-injected keys) and
-# interactive (file-based keys) modes without triggering Tirith's subshell
-# detection. The tirith policy downgrades analysis_incomplete from HIGH to
-# info so $(cat ...) patterns in curl don't block unattended runs.
+# Paperclip API wrapper. pcp-api.sh handles both heartbeat (env-injected
+# keys) and interactive (file-based keys) modes without triggering
+# Tirith's subshell detection.
 COPY _local/bin/pcp-api.sh /home/${USER}/.local/bin/pcp-api.sh
 RUN chmod 0755 /home/${USER}/.local/bin/pcp-api.sh
 COPY etc/tirith/policy.yaml /home/${USER}/.config/tirith/policy.yaml
+
+# Initialize the tirith shell hook at build time so the hook library
+# lands in an image layer. The eval line goes into the hermes bash
+# profile so every interactive and non-interactive shell is protected.
+# XDG_DATA_HOME is set to a path in the image layer (not the data
+# volume) so the hook files survive volume mounts.
+ENV XDG_DATA_HOME=/home/${USER}/.local/share
+RUN SHELL=/bin/bash tirith init --shell bash > /dev/null 2>&1 || true; \
+    mkdir -p /home/${USER}/.local/share/tirith; \
+    echo '# tirith shell hook — intercepts commands before execution' >> /home/${USER}/.bashrc; \
+    echo 'eval "$(tirith init --shell bash)"' >> /home/${USER}/.bashrc
 
 # EXPOSE 8080/tcp 9119/tcp 8645/tcp
 WORKDIR /home/hermes/.hermes

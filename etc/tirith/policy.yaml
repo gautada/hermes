@@ -1,20 +1,94 @@
-# Default tirith policy for Hermes agents with Paperclip integration.
-# Placed at $HERMES_HOME/tirith/policy.yaml, symlinked to
-# ~/.config/tirith/policy.yaml by the agent bootstrap hook.
-schema_version: 2
+# Tirith security policy — "ai-agent-heavy" template
+# Generated from tirith 0.4.2: tirith policy init --template ai-agent-heavy
+# Tuned for environments where AI agents run many shell commands.
+#
+# This file is baked into the image layer at ~/.config/tirith/policy.yaml
+# by the Containerfile (plain COPY, not a symlink). A downstream agent
+# image overrides it by shipping its own copy at the same path in its own
+# image layer.
+#
+# Do NOT move this file onto the data volume (/mnt/volumes/data aka
+# /home/hermes/.hermes). The volume would mask the baked-in default and
+# any agent that has not created its own copy would silently lose the
+# baseline policy.
+#
+# Policy precedence: a repo-scoped .tirith/policy.yaml REPLACES this
+# file outright (no merge). A repo-level policy must be written as a
+# superset, not a fragment, or the base posture silently disappears.
+
 fail_mode: open
-allow_bypass_env: true
+paranoia: 3
+allow_bypass_env: false
 allow_bypass_env_noninteractive: false
-paranoia: 1
+strict_warn: true
+gateway_profile: secure
+
 severity_overrides:
-  # Tirith cannot resolve $(cat ...) subshell expansions and reports
-  # analysis_incomplete at HIGH — blocking even allowlisted destinations.
-  # Downgrade to info so curl commands with inline key reads work in
-  # unattended (Paperclip heartbeat) mode.
+  curl_pipe_shell: CRITICAL
+  wget_pipe_shell: CRITICAL
+  httpie_pipe_shell: CRITICAL
+  xh_pipe_shell: CRITICAL
+  pipe_to_interpreter: HIGH
+  shortened_url: HIGH
+  docker_untrusted_registry: HIGH
+  # [hermes addition] Tirith 0.4.2 cannot resolve $(…) subshell expansions
+  # and reports analysis_incomplete at HIGH severity — blocking even
+  # allowlisted destinations in unattended mode. The Hermes-side
+  # command_allowlist does NOT fix this because tirith runs before the
+  # Hermes allowlist check. This override is the actual fix.
   analysis_incomplete: info
-additional_known_domains: []
+
+approval_rules:
+  - rule_ids:
+      - curl_pipe_shell
+      - wget_pipe_shell
+      - httpie_pipe_shell
+      - xh_pipe_shell
+      - pipe_to_interpreter
+    timeout_secs: 120
+    fallback: block
+
+escalation:
+  # Block after repeated high-risk detections within a time window.
+  # Covers pipe-to-shell, install-script, typosquat, secret-exfil,
+  # and remote-exec rule families.
+  - trigger: repeat_count
+    rule_ids:
+      - curl_pipe_shell
+      - wget_pipe_shell
+      - httpie_pipe_shell
+      - xh_pipe_shell
+      - pipe_to_interpreter
+      - install_script_curl
+      - install_script_wget
+      - typosquat_npm
+      - typosquat_pypi
+      - typosquat_cargo
+      - typosquat_gem
+      - secret_exfil_curl
+      - secret_exfil_wget
+      - secret_exfil_httpie
+      - secret_exfil_nc
+      - secret_exfil_ssh
+      - remote_exec_ssh
+      - remote_exec_nc
+      - remote_exec_ncat
+      - remote_exec_socat
+      - remote_exec_telnet
+      - reverse_shell_bash
+      - reverse_shell_python
+      - reverse_shell_perl
+      - reverse_shell_ruby
+      - reverse_shell_php
+    threshold: 5
+    window_minutes: 60
+    action: block
+  # Block when multiple MEDIUM-severity findings accumulate — prevents
+  # low-and-slow evasion.
+  - trigger: multi_medium
+    min_findings: 3
+    action: block
+
 allowlist: []
 blocklist: []
-approval_rules: []
-network_deny: []
-network_allow: []
+scan: {}
