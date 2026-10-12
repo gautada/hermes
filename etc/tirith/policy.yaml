@@ -1,16 +1,25 @@
-# Default tirith policy for Hermes agents with Paperclip integration.
-# Placed at $HERMES_HOME/tirith/policy.yaml, symlinked to
-# ~/.config/tirith/policy.yaml by the agent bootstrap hook.
+# Default tirith policy for the base hermes agent image.
+#
+# This file is baked into the image layer at ~/.config/tirith/policy.yaml
+# by the Containerfile (plain COPY, not a symlink). A downstream agent
+# image overrides it by shipping its own copy at the same path in its own
+# image layer.
+#
+# Do NOT move this file onto the data volume (/mnt/volumes/data aka
+# /home/hermes/.hermes). The volume would mask the baked-in default and
+# any agent that has not created its own copy would silently lose the
+# baseline policy.
 schema_version: 2
 fail_mode: open
 allow_bypass_env: true
 allow_bypass_env_noninteractive: false
 paranoia: 1
 severity_overrides:
-  # Tirith cannot resolve $(cat ...) subshell expansions and reports
-  # analysis_incomplete at HIGH — blocking even allowlisted destinations.
-  # Downgrade to info so curl commands with inline key reads work in
-  # unattended (Paperclip heartbeat) mode.
+  # Tirith 0.4.2 cannot resolve $(…) subshell expansions and reports
+  # analysis_incomplete at HIGH severity — blocking even allowlisted
+  # destinations in unattended mode. The Hermes-side command_allowlist
+  # does NOT fix this because tirith runs before the Hermes allowlist
+  # check. This override is the actual fix.
   analysis_incomplete: info
 additional_known_domains: []
 allowlist: []

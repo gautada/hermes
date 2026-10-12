@@ -137,6 +137,37 @@ COPY etc/services.d/hermes-dashboard/run /etc/services.d/hermes-dashboard/run
 RUN chmod 0755 /etc/services.d/hermes-dashboard/run
 
 # ╭――――――――――――――――――╮
+# │ TIRITH           │
+# ╰――――――――――――――――――╯
+# Terminal security tool — intercepts and analyzes shell commands before
+# execution. Installed to /usr/local/bin so the Hermes default
+# `tirith_path: tirith` resolves it on PATH. No downstream agent needs
+# any configuration to inherit a working, policied tirith.
+#
+# Source: https://github.com/sheeki03/tirith (canonical per https://tirith.sh)
+# Pinned version with checksum verification. Do not fetch the threat DB at
+# build time — it auto-populates on first run (avoids GitHub rate limits
+# across parallel image builds).
+ARG TIRITH_VERSION=0.4.2
+RUN set -e; \
+    ARCH="$(dpkg --print-architecture)"; \
+    case "$ARCH" in \
+      amd64)  TRIPLE="x86_64-unknown-linux-gnu" \
+              SHA256="efa6bf414a83dba385d4f13137e8677f850ced9102fe74ebb14c72f31df0dc77" ;; \
+      arm64)  TRIPLE="aarch64-unknown-linux-gnu" \
+              SHA256="c550b1bfb0c8c872ab3421cd6ef756f260f7cf4981a18cedd49f141fa2d77569" ;; \
+      *)      echo "Unsupported architecture: $ARCH" >&2; exit 1 ;; \
+    esac; \
+    TARBALL="tirith-${TRIPLE}.tar.gz"; \
+    URL="https://github.com/sheeki03/tirith/releases/download/v${TIRITH_VERSION}/${TARBALL}"; \
+    curl -fsSL -o "/tmp/${TARBALL}" "$URL"; \
+    echo "${SHA256}  /tmp/${TARBALL}" | sha256sum -c -; \
+    tar -xzf "/tmp/${TARBALL}" -C /tmp; \
+    install -m 0755 /tmp/tirith /usr/local/bin/tirith; \
+    rm -rf /tmp/tirith /tmp/"${TARBALL}" /tmp/completions /tmp/man /tmp/README* /tmp/LICENSE*; \
+    tirith --version
+
+# ╭――――――――――――――――――╮
 # │ PAPERCLIP        │
 # ╰――――――――――――――――――╯
 # Paperclip API wrapper and default tirith security policy for agent
