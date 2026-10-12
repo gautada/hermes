@@ -302,3 +302,62 @@ production release. Before production use, pin all source image digests and
 `HERMES_REF`, complete an image build and smoke test, and define
 deployment-specific health checks, resource limits, networking, and secret
 management.
+
+## Security — tirith
+
+The image ships [tirith](https://tirith.sh) 0.4.2, a terminal security tool
+that intercepts and analyzes shell commands before execution. Every downstream
+agent image inherits a working, policied tirith with zero configuration.
+
+### What you get for free
+
+- **tirith on PATH** at `/usr/local/bin/tirith`. The Hermes default
+  `tirith_path: tirith` resolves it automatically — no `security.tirith_path`
+  override needed.
+- **A baseline policy** baked into the image layer at
+  `~/.config/tirith/policy.yaml`. The only non-default setting is
+  `severity_overrides.analysis_incomplete: info`, which prevents tirith from
+  blocking `curl` commands that use `$(cat ...)` subshell patterns for inline
+  key reads (tirith 0.4.2 cannot resolve subshells and reports
+  `analysis_incomplete` at HIGH severity).
+- **An empty allowlist.** The base image does not pre-trust any domains. Each
+  agent adds its own allowlist entries downstream.
+
+### Adding your own allowlist domains
+
+Ship your own `~/.config/tirith/policy.yaml` in your downstream image layer.
+Copy the base policy and add entries to the `allowlist` array:
+
+```yaml
+allowlist:
+  - my-api.example.com
+  - internal-service.corp.net
+```
+
+**Important:** A repo-scoped `.tirith/policy.yaml` is tightening-only — its
+`allowlist` entries are ignored. You must override the user-scope policy
+(the image-layer file) to add trusted domains.
+
+### What not to do
+
+- **Do not move the policy onto the data volume** (`/mnt/volumes/data` aka
+  `/home/hermes/.hermes`). The volume would mask the baked-in default, and any
+  agent that has not created its own copy would silently lose the baseline
+  policy.
+- **Do not rely on `tirith_fail_open: true`** to mean tirith is working.
+  `fail_mode: open` means a broken tirith silently allows everything — it
+  looks exactly like a working install at runtime. The build-time smoke check
+  (`tirith --version`) catches binary-level breakage.
+
+### Recommended downstream setting
+
+For agents dispatched by Paperclip (or any unattended orchestrator), consider
+adding to your Hermes configuration:
+
+```yaml
+approvals:
+  unattended_mode: smart
+```
+
+This is not set by default in the base image because it changes approval
+behaviour fleet-wide. Enable it per-agent after review.
