@@ -144,6 +144,159 @@ podman rm hermes
 The `hermes-data` volume is intentionally retained when the container is
 removed.
 
+## Security — tirith
+
+The image ships a working [tirith](https://tirith.sh/) installation (v0.4.2)
+at `/usr/local/bin/tirith`. Hermes uses tirith as a pre-execution scanner: every
+shell command issued through the terminal tool is analysed for security risks
+before it runs.
+
+The base policy is the upstream `ai-agent-heavy` template — tuned for
+environments where AI agents run many shell commands. It ships with `paranoia: 3`,
+strict-warn enabled, pipe-to-shell patterns escalated to CRITICAL, and approval
+rules that block after a 120-second timeout.
+
+### What every agent gets for free
+
+A fresh downstream image (e.g. `gautada/nyxcalder`, `gautada/rennakatomi`)
+inherits all of the following with no extra configuration:
+
+- **tirith binary** on PATH — Hermes auto-detects it via the default
+  `security.tirith_path` setting.
+- **Hardened policy** at `/home/hermes/.config/tirith/policy.yaml`:
+  `paranoia: 3`, `strict_warn: true`, `gateway_profile: secure`,
+  pipe-to-shell escalations, and the `analysis_incomplete: info` severity
+  override that prevents `$(cat ...)` subshell patterns from blocking
+  unattended runs.
+- **zsh shell hook** loaded via `~/.zshenv.d/tirith.zsh` — protects
+  interactive sessions (human `podman exec` into the container).
+- **Claude Code hook** — `~/.claude/hooks/tirith-check.py` with a PreToolUse
+  entry and MCP server registered in `~/.claude/settings.json`. Inert unless
+  Claude Code is installed, but ready to provide in-band tool-call protection.
+- **Threat database** seeded at build time (~11 MB) and auto-updates every
+  24 hours at runtime.
+- **pcp-api.sh** at `/home/hermes/.local/bin/pcp-api.sh` — a Paperclip API
+  wrapper that avoids tirith's subshell detection for Bearer-token headers.
+- **Approval rules** with `timeout_secs: 120, fallback: block` — an
+  unattended agent with no approval responder gets a clean block after two
+  minutes instead of burning its entire run window.
+
+### What it does NOT get
+
+Installing tirith does **not** automatically intercept the agent's own
+non-interactive tool calls. The shell hook relies on `preexec`, which does
+not fire for `zsh -c` invocations — the way an agent harness runs commands.
+Protection of agent tool calls requires the harness itself to have a pre-tool
+hook that calls `tirith check --json`. The Claude Code hook provides this for
+Claude Code; Hermes itself does not yet have a tirith integration point.
+
+### Overriding the policy downstream
+
+The base image's policy is baked into the image layer at
+`/home/hermes/.config/tirith/policy.yaml`. It is intentionally NOT on the data
+volume, so downstream images always inherit a known-good default.
+
+To customise the policy for a specific agent:
+
+1. Place a policy file on the agent's durable volume, e.g.
+   `/mnt/volumes/data/tirith/policy.yaml`.
+2. In the agent's bootstrap hook, symlink it into the config directory:
+
+   ```sh
+   mkdir -p "$HOME/.config/tirith"
+   ln -sf /mnt/volumes/data/tirith/policy.yaml "$HOME/.config/tirith/policy.yaml"
+   ```
+
+3. The symlink takes precedence over the baked-in file. If the volume is
+   empty or the symlink is removed, the image layer's default is restored
+   automatically.
+
+### Extending the policy without breaking inheritance
+
+- **Add trusted domains**: use `tirith trust add <domain>` instead of editing
+  the base image's `allowlist`. Trust entries have a 30-day TTL by default;
+  broader scope requires an explicit `--broad` flag. Manage with
+  `tirith trust list`, `tirith trust explain`, `tirith trust diff`,
+  `tirith trust remove`, `tirith trust gc`.
+- **Tighten rules**: a repo-scoped `.tirith/policy.yaml` can only tighten
+  (blocklist, deny), never loosen (its allowlist is ignored by design).
+  Loosening must go in the user-scoped `~/.config/tirith/policy.yaml`.
+- **Add approval rules**: same approach — add them to the agent's override.
+
+### Policy precedence — important
+
+Policy discovery order is:
+
+1. `.tirith/policy.yaml` in the current directory, walking up to the repo root
+2. `~/.config/tirith/policy.yaml`
+
+The first match **wins outright — it does not merge**. An agent working inside a
+repo that contains its own `.tirith/policy.yaml` **silently loses the entire base
+posture** with no warning. A repo-level policy must be written as a complete
+superset of the base, not a fragment.
+
+### State vs config — what lives where
+
+| Kind | Location | Layer |
+|---|---|---|
+| Policy | `~/.config/tirith/policy.yaml` | Image (inherited) |
+| Shell hooks | `~/.local/share/tirith/shell/lib/` | Image (materialized at build) |
+| Threat DB | `~/.local/share/tirith/tirith-threatdb.dat` | Image (seeded), runtime updates |
+| Audit JSONL | `~/.local/state/tirith/` | Data volume (mutable) |
+| Trust store | `~/.local/share/tirith/trust/` | Data volume (mutable) |
+| AI config snapshots | per-repo | Data volume (mutable) |
+| Run receipts | `~/.local/state/tirith/` | Data volume (mutable) |
+
+Mutable state belongs on the data volume so it survives container replacement.
+Config and hooks belong in the image layer so they are inherited.
+
+### Known gotchas
+
+- `$(cat ...)` in curl commands triggers `analysis_incomplete` at HIGH. The
+  base policy downgrades this to `info`. If you reset `severity_overrides` in
+  your override, re-add `analysis_incomplete: info` or authenticated API
+  calls will block in unattended mode.
+- Repo-scoped `.tirith/policy.yaml` allowlist entries are ignored by design.
+  Only the user-scoped policy at `~/.config/tirith/policy.yaml` controls
+  allowed domains.
+- `allow_bypass_env: false` means **`TIRITH=0` does not work** — interactive
+  or not. This is intentional in the agent-heavy preset. Fix the policy or
+  add a trust entry instead of reaching for the env var.
+- `tirith_fail_open: true` (the Hermes default) means a crashed or timed-out
+  tirith silently provides no protection. The build-time `tirith doctor
+  --quick` check validates the installation, but there is no runtime health
+  check.
+
+### AI config drift detection (recommended)
+
+`tirith ai` watches files that steer agent behaviour — `CLAUDE.md`,
+`AGENTS.md`, `.claude/*`, `.mcp.json` — and diffs them against a last-known-safe
+snapshot for hidden-instruction injection and tool-use escalation. This is not
+enabled by default in the base image.
+
+To use it in a repo:
+
+```sh
+tirith ai snapshot --update   # record a baseline
+tirith ai diff                # check for drift
+```
+
+### Recommended Hermes config setting
+
+For agents dispatched by Paperclip, `approvals.unattended_mode: smart` is
+recommended in the agent's Hermes config. This is not set in the base image
+because it affects approval behaviour fleet-wide — each agent should opt in
+explicitly.
+
+### Inspecting the effective policy
+
+```sh
+tirith policy effective
+```
+
+Shows which policy file is in use and any weakening fields that were
+neutralized from a repo-scoped policy.
+
 ## Current status
 
 This is an initial container definition. It follows the `gautada/debian`
