@@ -179,11 +179,13 @@ agent image inherits a working, policied tirith with zero configuration.
 ### Configuration vs state split
 
 **In the image layer** (survives container replacement only via rebuild):
+
 - Policy: `~/.config/tirith/policy.yaml`
 - Shell hook library: `~/.local/share/tirith/`
 - Binary: `/usr/local/bin/tirith`
 
 **On the data volume** (`/mnt/volumes/data` aka `/home/hermes/.hermes`):
+
 - Audit log (JSONL)
 - Trust store (`tirith trust` entries)
 - Threat database

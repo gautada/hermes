@@ -183,6 +183,7 @@ COPY etc/tirith/policy.yaml /home/${USER}/.config/tirith/policy.yaml
 # XDG_DATA_HOME is set to a path in the image layer (not the data
 # volume) so the hook files survive volume mounts.
 ENV XDG_DATA_HOME=/home/${USER}/.local/share
+# hadolint ignore=SC2016
 RUN SHELL=/bin/bash tirith init --shell bash > /dev/null 2>&1 || true; \
     mkdir -p /home/${USER}/.local/share/tirith; \
     echo '# tirith shell hook — intercepts commands before execution' >> /home/${USER}/.bashrc; \
