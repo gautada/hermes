@@ -1,20 +1,137 @@
-# Default tirith policy for Hermes agents with Paperclip integration.
-# Placed at $HERMES_HOME/tirith/policy.yaml, symlinked to
-# ~/.config/tirith/policy.yaml by the agent bootstrap hook.
-schema_version: 2
+# Tirith security policy — "ai-agent-heavy" template (v0.4.2)
+# Tuned for environments where AI agents run many shell commands.
+# Documentation: https://tirith.dev/docs/policy
+#
+# Generated with: tirith policy init --template ai-agent-heavy
+# Vendored into the base hermes image for reviewability and reproducibility.
+#
+# Installed to /home/hermes/.config/tirith/policy.yaml by the Containerfile
+# (plain COPY — no symlink, no bootstrap hook).
+#
+# Downstream agent images inherit this policy automatically from the base
+# image layer. To override it at runtime, place a custom policy.yaml on the
+# agent's durable volume and symlink it to ~/.config/tirith/policy.yaml in
+# the agent's bootstrap hook. The image layer copy stays intact as a fallback.
+#
+# Do NOT move this file onto the data volume (/mnt/volumes/data) or symlink
+# it there in the base image: a downstream volume mount would mask it and
+# the default would silently disappear.
+
+# Fail mode: "open" — an internal tirith error should not wedge an agent
+# mid-task. Risk is managed below via paranoia, approval, and escalation.
 fail_mode: open
-allow_bypass_env: true
+
+# Paranoia level (1-4): 3 — agents paste and run far more untrusted input
+# than a human, so detection is turned up.
+paranoia: 3
+
+# Disable the `TIRITH=0` bypass entirely — interactive AND non-interactive.
+# An agent-heavy profile is opting into hardened defaults, so neither a human
+# at a TTY nor a non-interactive agent may skip analysis. Set
+# `allow_bypass_env: true` yourself if you want a local human escape hatch.
+allow_bypass_env: false
 allow_bypass_env_noninteractive: false
-paranoia: 1
+
+# Require explicit acknowledgement for warn findings.
+strict_warn: true
+
+# MCP gateway posture: "secure". When you run `tirith gateway run`, any gateway
+# config knob you did NOT set yourself takes a hardened default instead of the
+# permissive built-in: the gateway fails CLOSED on an analysis error, treats a
+# warn verdict as a denial, and uses a tighter per-message size cap. A value you
+# set explicitly in the gateway config always wins, so this only fills the gaps.
+# This is the agent-heavy default because an autonomous agent benefits from a
+# gateway that denies on doubt rather than forwarding. Remove this line to keep
+# the permissive gateway defaults.
+gateway_profile: secure
+
+# Escalate remote-execution and Docker-registry rules — the patterns agents
+# most often produce from hallucinated or copy-pasted instructions.
 severity_overrides:
-  # Tirith cannot resolve $(cat ...) subshell expansions and reports
-  # analysis_incomplete at HIGH — blocking even allowlisted destinations.
-  # Downgrade to info so curl commands with inline key reads work in
-  # unattended (Paperclip heartbeat) mode.
+  curl_pipe_shell: CRITICAL
+  wget_pipe_shell: CRITICAL
+  httpie_pipe_shell: CRITICAL
+  xh_pipe_shell: CRITICAL
+  pipe_to_interpreter: HIGH
+  shortened_url: HIGH
+  docker_untrusted_registry: HIGH
+  # [hermes addition] Tirith 0.4.2 cannot resolve $(cat ...) subshell
+  # expansions and reports analysis_incomplete at HIGH — blocking even
+  # allowlisted destinations. Downgrade to info so curl commands with inline
+  # key reads (e.g. pcp-api.sh) work in unattended (Paperclip heartbeat) mode.
   analysis_incomplete: info
-additional_known_domains: []
+
+# Approval rules: a command matching any listed rule pauses for human
+# approval before it runs. fallback is what happens on timeout.
+approval_rules:
+  - rule_ids:
+      - curl_pipe_shell
+      - wget_pipe_shell
+      - httpie_pipe_shell
+      - xh_pipe_shell
+      - pipe_to_interpreter
+    timeout_secs: 120
+    fallback: block
+
+# Escalation: upgrade to a block when an agent keeps re-trying flagged work.
+escalation:
+  # Block when a GENUINELY-RISKY rule fires 5+ times within an hour.
+  #
+  # `rule_ids` is a curated list rather than `["*"]` on purpose: the
+  # repeat_count trigger has no severity gate (it matches purely on rule_ids —
+  # see `EscalationRule::RepeatCount` in tirith-core/src/escalation.rs), so a
+  # wildcard would escalate EVERY repeated finding, including informational
+  # notes like `repo_command_unknown` and other Info-severity annotations.
+  # Normal agent churn (5 repeats of a benign-but-uncatalogued command) would
+  # then become a hard block. The list below is the pipe-to-shell /
+  # install-script / typosquat / secret / remote-exec family — the same
+  # families already escalated via severity_overrides and approval_rules above.
+  # Add a rule id here if you want repeated attempts at it to hard-block.
+  - trigger: repeat_count
+    rule_ids:
+      # Pipe-to-shell (curl/wget/httpie/xh | sh) + generic pipe-to-interpreter.
+      - curl_pipe_shell
+      - wget_pipe_shell
+      - httpie_pipe_shell
+      - xh_pipe_shell
+      - pipe_to_interpreter
+      # Install-script / package execution risks.
+      - pip_url_install
+      - npm_url_install
+      - package_script_dangerous
+      - package_policy_unknown_package_with_install_scripts
+      # Typosquat / dependency-confusion (hallucinated or look-alike names).
+      - git_typosquat
+      - threat_package_typosquat
+      - package_policy_typosquat_distance
+      - package_dependency_confusion
+      # Secret / credential exfiltration.
+      - credential_file_sweep
+      - sensitive_env_export
+      - data_exfiltration
+      - high_entropy_secret
+      - private_key_exposed
+      - credential_in_text
+      # Remote-exec / untrusted registry.
+      - docker_untrusted_registry
+      - base64_decode_execute
+    threshold: 5
+    window_minutes: 60
+    action: block
+  # Block when one command produces 3+ medium-or-higher findings at once.
+  - trigger: multi_medium
+    min_findings: 3
+    action: block
+
+# URL / host patterns that always pass analysis. Keep this list tight — an
+# over-broad allowlist lets an agent route around tirith.
+# [hermes note] Each downstream agent adds its own trusted domains (e.g.
+# paperclip.gautier.org, git.gautier.org) to its own durable override policy.
+# The base image ships with an empty allowlist on purpose.
 allowlist: []
+
+# URL / host patterns that are always blocked (overrides allowlist).
 blocklist: []
-approval_rules: []
-network_deny: []
-network_allow: []
+
+# `tirith scan` configuration.
+scan: {}

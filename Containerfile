@@ -1,6 +1,7 @@
 ARG DEBIAN_VERSION=13.7
 ARG NODE_VERSION=24.20.0
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:latest
+ARG TIRITH_VERSION=0.4.2
 FROM ${UV_IMAGE} AS uv
 
 FROM docker.io/gautada/node:${NODE_VERSION} as build
@@ -54,6 +55,33 @@ RUN git submodule update --init --recursive \
  && (find /opt/python /opt/hermes/.venv -type d \( -name tests -o -name test \) -exec rm -rf {} + 2>/dev/null || true) \
  && (find /opt/python /opt/hermes/.venv -name "*.pyc" -delete 2>/dev/null || true) \
  && (find /opt/python /opt/hermes/.venv -name "*.pyi" -delete 2>/dev/null || true)
+
+# ╭――――――――――――――――――╮
+# │ TIRITH           │
+# ╰――――――――――――――――――╯
+# Download the pre-built tirith binary for the target architecture. Source:
+# https://github.com/sheeki03/tirith (canonical, confirmed via tirith.sh).
+# SHA-256 checksums are pinned from the v0.4.2 checksums.txt release asset.
+ARG TIRITH_VERSION
+ARG TARGETARCH
+RUN set -e; \
+    case "${TARGETARCH}" in \
+      amd64) TIRITH_ARCH="x86_64-unknown-linux-gnu" \
+             TIRITH_SHA256="efa6bf414a83dba385d4f13137e8677f850ced9102fe74ebb14c72f31df0dc77" ;; \
+      arm64) TIRITH_ARCH="aarch64-unknown-linux-gnu" \
+             TIRITH_SHA256="c550b1bfb0c8c872ab3421cd6ef756f260f7cf4981a18cedd49f141fa2d77569" ;; \
+      *)     echo "Unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    TIRITH_URL="https://github.com/sheeki03/tirith/releases/download/v${TIRITH_VERSION}/tirith-${TIRITH_ARCH}.tar.gz"; \
+    echo "Downloading tirith v${TIRITH_VERSION} for ${TIRITH_ARCH}..."; \
+    curl -fsSL "${TIRITH_URL}" -o /tmp/tirith.tar.gz \
+ && echo "${TIRITH_SHA256}  /tmp/tirith.tar.gz" | sha256sum -c - \
+ && tar -xzf /tmp/tirith.tar.gz -C /tmp \
+ && install -m 0755 /tmp/tirith /usr/local/bin/tirith \
+ && rm -rf /tmp/tirith.tar.gz /tmp/tirith \
+ && tirith --version \
+ && tirith verify-self \
+ && tirith version --provenance
 
 # ╭――――――――――――――――――――――――――――╮
 # │ FINAL                      │
@@ -121,6 +149,15 @@ RUN /opt/hermes/.venv/bin/python --version \
  && /opt/hermes/.venv/bin/hermes --help >/dev/null
 
 # ╭――――――――――――――――――╮
+# │ TIRITH           │
+# ╰――――――――――――――――――╯
+# Copy the pre-built tirith binary from the build stage. Placed on PATH so
+# Hermes finds it with the default security.tirith_path ("tirith").
+# Materialize shell hook files and seed the threat database into the image
+# layer so they are available on first boot without a network call.
+COPY --from=build /usr/local/bin/tirith /usr/local/bin/tirith
+
+# ╭――――――――――――――――――╮
 # │ VERSION          │
 # ╰――――――――――――――――――╯
 # Override the base image's Debian version reporter with the application
@@ -142,8 +179,8 @@ RUN chmod 0755 /etc/services.d/hermes-dashboard/run
 # Paperclip API wrapper and default tirith security policy for agent
 # coordination. pcp-api.sh handles both heartbeat (env-injected keys) and
 # interactive (file-based keys) modes without triggering Tirith's subshell
-# detection. The tirith policy downgrades analysis_incomplete from HIGH to
-# info so $(cat ...) patterns in curl don't block unattended runs.
+# detection. The tirith policy is the ai-agent-heavy template with the
+# hermes-specific analysis_incomplete override.
 COPY _local/bin/pcp-api.sh /home/${USER}/.local/bin/pcp-api.sh
 RUN chmod 0755 /home/${USER}/.local/bin/pcp-api.sh
 COPY etc/tirith/policy.yaml /home/${USER}/.config/tirith/policy.yaml
@@ -154,5 +191,20 @@ RUN mkdir -p /home/${USER}/.local/bin \
  && ln -fsv /opt/hermes/.venv/bin/hermes /home/${USER}/.local/bin/hermes \
  && chown ${USER}:${USER} -R /opt/hermes /home/${USER} /mnt/volumes/data
 ENV PATH="/home/${USER}/.local/bin:${PATH}"
+
+# ╭――――――――――――――――――――――――――╮
+# │ TIRITH SETUP (as user)   │
+# ╰――――――――――――――――――――――――――╯
+# Materialize shell hooks, seed the threat database, and run the doctor
+# smoke check — all as the runtime user so XDG paths resolve correctly.
+# Shell hooks land in ~/.local/share/tirith/shell/lib/ (image layer, NOT the
+# data volume). Threat DB lands in ~/.local/share/tirith/ (~11 MB).
+USER ${USER}
+RUN tirith init --shell bash --quiet \
+ && tirith threat-db update \
+ && tirith doctor --quick
+USER root
+RUN chown ${USER}:${USER} -R /home/${USER}
+
 EXPOSE 8080
 WORKDIR /home/hermes
