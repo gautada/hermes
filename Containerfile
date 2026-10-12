@@ -2,6 +2,7 @@ ARG DEBIAN_VERSION=13.7
 ARG NODE_VERSION=24.20.0
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:latest
 ARG TIRITH_VERSION=0.4.2
+# hadolint ignore=DL3006
 FROM ${UV_IMAGE} AS uv
 
 FROM docker.io/gautada/node:${NODE_VERSION} as build
@@ -233,6 +234,7 @@ RUN tirith setup claude-code --with-mcp --scope user 2>/dev/null || true
 RUN tirith doctor --quick 2>/dev/null || true
 USER root
 RUN chown ${USER}:${USER} -R /home/${USER}
+USER ${USER}
 
 EXPOSE 8080
 WORKDIR /home/hermes
