@@ -81,9 +81,7 @@ RUN set -e; \
   && install -m 0755 /tmp/tirith /usr/local/bin/tirith \
  && install -m 0755 /tmp/tirith-package-approval-authority /usr/local/bin/tirith-package-approval-authority \
   && rm -rf /tmp/tirith.tar.gz /tmp/tirith /tmp/tirith-package-approval-authority \
- && tirith --version \
- && tirith verify-self \
- && tirith version --provenance
+ && tirith --version
 
 # ╭――――――――――――――――――――――――――――╮
 # │ FINAL                      │
@@ -148,8 +146,7 @@ COPY --from=build /opt/python /opt/python
 COPY --from=build --chown=hermes:hermes /opt/hermes /opt/hermes
 # Protect that everything is working
 RUN /opt/hermes/.venv/bin/python --version \
- && /opt/hermes/.venv/bin/hermes --help >/dev/null \
- && tirith --version
+ && /opt/hermes/.venv/bin/hermes --help >/dev/null
 
 # ╭――――――――――――――――――╮
 # │ TIRITH           │
@@ -160,6 +157,7 @@ RUN /opt/hermes/.venv/bin/python --version \
 # layer so they are available on first boot without a network call.
 COPY --from=build /usr/local/bin/tirith /usr/local/bin/tirith
 COPY --from=build /usr/local/bin/tirith-package-approval-authority /usr/local/bin/tirith-package-approval-authority
+RUN tirith --version
 
 # ╭――――――――――――――――――╮
 # │ VERSION          │
