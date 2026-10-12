@@ -168,8 +168,11 @@ inherits all of the following with no extra configuration:
   pipe-to-shell escalations, and the `analysis_incomplete: info` severity
   override that prevents `$(cat ...)` subshell patterns from blocking
   unattended runs.
-- **Shell hooks** materialized at build time in
-  `~/.local/share/tirith/shell/lib/` — available for interactive sessions.
+- **zsh shell hook** loaded via `~/.zshenv.d/tirith.zsh` — protects
+  interactive sessions (human `podman exec` into the container).
+- **Claude Code hook** — `~/.claude/hooks/tirith-check.py` with a PreToolUse
+  entry and MCP server registered in `~/.claude/settings.json`. Inert unless
+  Claude Code is installed, but ready to provide in-band tool-call protection.
 - **Threat database** seeded at build time (~11 MB) and auto-updates every
   24 hours at runtime.
 - **pcp-api.sh** at `/home/hermes/.local/bin/pcp-api.sh` — a Paperclip API
@@ -177,6 +180,15 @@ inherits all of the following with no extra configuration:
 - **Approval rules** with `timeout_secs: 120, fallback: block` — an
   unattended agent with no approval responder gets a clean block after two
   minutes instead of burning its entire run window.
+
+### What it does NOT get
+
+Installing tirith does **not** automatically intercept the agent's own
+non-interactive tool calls. The shell hook relies on `preexec`, which does
+not fire for `zsh -c` invocations — the way an agent harness runs commands.
+Protection of agent tool calls requires the harness itself to have a pre-tool
+hook that calls `tirith check --json`. The Claude Code hook provides this for
+Claude Code; Hermes itself does not yet have a tirith integration point.
 
 ### Overriding the policy downstream
 
@@ -272,6 +284,15 @@ For agents dispatched by Paperclip, `approvals.unattended_mode: smart` is
 recommended in the agent's Hermes config. This is not set in the base image
 because it affects approval behaviour fleet-wide — each agent should opt in
 explicitly.
+
+### Inspecting the effective policy
+
+```sh
+tirith policy effective
+```
+
+Shows which policy file is in use and any weakening fields that were
+neutralized from a repo-scoped policy.
 
 ## Current status
 
