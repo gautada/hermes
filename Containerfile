@@ -167,7 +167,10 @@ RUN chmod 0755 /usr/bin/container-version
 COPY etc/services.d/hermes-gateway/run /etc/services.d/hermes-gateway/run
 RUN chmod 0755 /etc/services.d/hermes-gateway/run
 COPY etc/services.d/hermes-dashboard/run /etc/services.d/hermes-dashboard/run
-RUN chmod 0755 /etc/services.d/hermes-dashboard/run
+# Dashboard service is installed but NOT executable by default.  s6 skips
+# non-executable run scripts so the dashboard will not start unless
+# explicitly enabled (see gautada/hermes issue for env-var activation).
+RUN chmod 0644 /etc/services.d/hermes-dashboard/run
 
 # ╭――――――――――――――――――╮
 # │ PAPERCLIP        │
