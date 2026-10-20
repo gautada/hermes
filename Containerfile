@@ -200,7 +200,8 @@ ENV PATH="/home/${USER}/.local/bin:${PATH}"
 # Hermes finds it with the default security.tirith_path ("tirith").
 # Materialize shell hook files and seed the threat database into the image
 # layer so they are available on first boot without a network call.
-RUN ln -fsv /mnt/volumes/configuration /etc/tirith/policy.yaml
+RUN mkdir -p /etc/tirith \
+ && ln -fsv /mnt/volumes/configuration /etc/tirith/policy.yaml
 COPY --from=build /usr/local/bin/tirith /usr/local/bin/tirith
 COPY --from=build /usr/local/bin/tirith-package-approval-authority \
                   /usr/local/bin/tirith-package-approval-authority
