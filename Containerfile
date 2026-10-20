@@ -201,10 +201,10 @@ ENV PATH="/home/${USER}/.local/bin:${PATH}"
 # ╰──────────────────────────╯
 # Copy the tirith binary built from source in the build stage. Placed on PATH so
 # Hermes finds it with the default security.tirith_path ("tirith").
-# Materialize shell hook files and seed the threat database into the image
-# layer so they are available on first boot without a network call.
-RUN mkdir -p /etc/tirith \
- && ln -fsv /mnt/volumes/configuration/policy.yaml /etc/tirith/policy.yaml
+# COPY the default policy into the image so tirith works out of the box
+# (including CI).  At runtime a volume mount at /mnt/volumes/configuration
+# can overlay /etc/tirith/policy.yaml via the cont-init.d symlink pattern.
+COPY mnt/configuration/policy.yaml /etc/tirith/policy.yaml
 COPY --from=build /usr/local/bin/tirith /usr/local/bin/tirith
 COPY --from=build /usr/local/bin/tirith-package-approval-authority \
                   /usr/local/bin/tirith-package-approval-authority
