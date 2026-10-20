@@ -5,7 +5,7 @@ APP_USER=$(id -nu 1000)
 HOME="/home/${APP_USER}"
 export HOME
 
-HERMES_WRITE_SAFE_ROOT="${HOME}/.hermes"
+HERMES_WRITE_SAFE_ROOT="${HERMES_WRITE_SAFE_ROOT:-${HOME}/.hermes}"
 export HERMES_WRITE_SAFE_ROOT
 
 exec s6-setuidgid "${APP_USER}" /opt/hermes/.venv/bin/hermes dashboard \
