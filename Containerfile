@@ -179,7 +179,9 @@ RUN chmod 0755 /etc/services.d/hermes-dashboard/run
 # hermes-specific analysis_incomplete override.
 COPY _local/bin/pcp-api.sh /home/${USER}/.local/bin/pcp-api.sh
 RUN chmod 0755 /home/${USER}/.local/bin/pcp-api.sh
-COPY etc/tirith/policy.yaml /home/${USER}/.config/tirith/policy.yaml
+RUN mkdir -p /home/${USER}/.config/tirith \
+ && ln -fsv /etc/tirith/policy.yaml /home/${USER}/.config/tirith/policy.yaml \
+ && chown -R ${USER}:${USER} /home/${USER}/.config/tirith
 # Tirith policy and rule validation is handled at runtime by the health.d
 # drop-in script (etc/health.d/tirith-check), exercised by container-test
 # in the CI test stage.
