@@ -60,28 +60,33 @@ RUN git submodule update --init --recursive \
 # ╭――――――――――――――――――╮
 # │ TIRITH           │
 # ╰――――――――――――――――――╯
-# Download the pre-built tirith binary for the target architecture. Source:
-# https://github.com/sheeki03/tirith (canonical, confirmed via tirith.sh).
-# SHA-256 checksums are pinned from the v0.4.2 checksums.txt release asset.
+# Build tirith from source to support any architecture without pre-built
+# binaries. Source: https://github.com/sheeki03/tirith
+# Requires the Rust toolchain; installed via rustup, then removed after the
+# build to keep the layer lean.
 ARG TIRITH_VERSION
-ARG TIRITH_URL="https://github.com/sheeki03/tirith/releases/download/v${TIRITH_VERSION}/tirith-${TIRITH_ARCH}.tar.gz"
-ARG TARGETARCH
-RUN set -e; \
-    case "${TARGETARCH}" in \
-      amd64) TIRITH_ARCH="x86_64-unknown-linux-gnu" \
-             TIRITH_SHA256="efa6bf414a83dba385d4f13137e8677f850ced9102fe74ebb14c72f31df0dc77" ;; \
-      arm64) TIRITH_ARCH="aarch64-unknown-linux-gnu" \
-             TIRITH_SHA256="c550b1bfb0c8c872ab3421cd6ef756f260f7cf4981a18cedd49f141fa2d77569" ;; \
-      *)     echo "Unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
-    esac \
-&& echo "Downloading tirith v${TIRITH_VERSION} for ${TIRITH_ARCH}..." \
-&& curl -fsSL "${TIRITH_URL}" -o /tmp/tirith.tar.gz \
-&& echo "${TIRITH_SHA256}  /tmp/tirith.tar.gz" | sha256sum -c - \
-&& tar -xzf /tmp/tirith.tar.gz -C /tmp \
-&& install -m 0755 /tmp/tirith /usr/local/bin/tirith \
-&& install -m 0755 /tmp/tirith-package-approval-authority /usr/local/bin/tirith-package-approval-authority \
-&& rm -rf /tmp/tirith.tar.gz /tmp/tirith /tmp/tirith-package-approval-authority \
-&& tirith --version
+ARG TIRITH_REPOSITORY=https://github.com/sheeki03/tirith.git
+# hadolint ignore=DL3008
+RUN apt-get update \
+ && apt-get install --yes --no-install-recommends pkg-config libssl-dev \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+ENV RUSTUP_HOME=/opt/rustup \
+    CARGO_HOME=/opt/cargo \
+    PATH="/opt/cargo/bin:${PATH}"
+# hadolint ignore=DL3003
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+      | sh -s -- -y --default-toolchain stable --profile minimal \
+ && git clone --branch "v${TIRITH_VERSION}" --depth 1 \
+      "${TIRITH_REPOSITORY}" /tmp/tirith-src \
+ && cd /tmp/tirith-src \
+ && cargo build --release --bin tirith --bin tirith-package-approval-authority \
+ && install -m 0755 target/release/tirith /usr/local/bin/tirith \
+ && install -m 0755 target/release/tirith-package-approval-authority \
+      /usr/local/bin/tirith-package-approval-authority \
+ && tirith --version \
+ && rm -rf /tmp/tirith-src "${RUSTUP_HOME}" "${CARGO_HOME}" \
+ && apt-get purge --yes --auto-remove pkg-config libssl-dev
 
 # ╭――――――――――――――――――――――――――――╮
 # │ FINAL                      │
@@ -189,7 +194,7 @@ ENV PATH="/home/${USER}/.local/bin:${PATH}"
 # ╭──────────────────────────╮
 # │ TIRITH                   │
 # ╰──────────────────────────╯
-# Copy the pre-built tirith binary from the build stage. Placed on PATH so
+# Copy the tirith binary built from source in the build stage. Placed on PATH so
 # Hermes finds it with the default security.tirith_path ("tirith").
 # Materialize shell hook files and seed the threat database into the image
 # layer so they are available on first boot without a network call.
