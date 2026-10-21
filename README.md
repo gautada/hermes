@@ -6,12 +6,15 @@ built on
 [`docker.io/gautada/debian:13.6`](https://hub.docker.com/r/gautada/debian).
 
 The image installs the Hermes CLI, gateway, web interface, and terminal UI. At
-runtime, the `gautada/debian` s6 supervisor starts both the base image's cron
-service and:
+runtime, the `gautada/debian` s6 supervisor starts the base image's cron
+service and the Hermes service, which defaults to the gateway:
 
 ```text
 hermes gateway run
 ```
+
+The service mode is configurable via environment variables — see
+[Service modes](#service-modes) below.
 
 Hermes runs as the unprivileged `hermes` user (the base image's `debian` user,
 renamed — following the same pattern as other `gautada` containers). Its home
@@ -46,6 +49,72 @@ podman build \
 The upstream repository and source images can also be overridden with the
 `HERMES_REPOSITORY`, `DEBIAN_IMAGE`, `UV_IMAGE`, and `NODE_IMAGE` build
 arguments.
+
+## Service modes
+
+The container runs a single s6-supervised service whose behaviour is controlled
+by environment variables. No image rebuild is needed to switch modes.
+
+| Variable | Default | Description |
+|---|---|---|
+| `HERMES_MODE` | `gateway` | Which services to run: `gateway`, `dashboard`, or `all` |
+| `HERMES_GATEWAY_URL` | `ws://localhost:9119` | WebSocket URL the dashboard connects to for its backend |
+| `HERMES_DASHBOARD_HOST` | `0.0.0.0` | Address the dashboard binds to (where it listens) |
+| `HERMES_DASHBOARD_PORT` | `8080` | Port the dashboard listens on |
+
+### gateway (default)
+
+Runs only the Hermes gateway. This is the default and matches the previous
+behaviour — no extra configuration required.
+
+```sh
+podman run --detach \
+  --name hermes \
+  --volume hermes-data:/mnt/volumes/data \
+  localhost/hermes:ai
+```
+
+### dashboard
+
+Runs only the web dashboard, connecting to a gateway running elsewhere. Use
+`HERMES_GATEWAY_URL` to point at the remote gateway.
+
+```sh
+podman run --detach \
+  --name hermes-dashboard \
+  --env HERMES_MODE=dashboard \
+  --env HERMES_GATEWAY_URL=ws://hermes.example.com:9119 \
+  --publish 8080:8080 \
+  localhost/hermes:ai
+```
+
+### all
+
+Runs both the gateway and dashboard in the same container. The dashboard
+connects to the co-located gateway at `ws://localhost:9119` by default.
+
+```sh
+podman run --detach \
+  --name hermes \
+  --env HERMES_MODE=all \
+  --volume hermes-data:/mnt/volumes/data \
+  --publish 8080:8080 \
+  --publish 9119:9119 \
+  localhost/hermes:ai
+```
+
+### Sidecar deployment (Kubernetes / pod)
+
+Run the gateway and dashboard as separate containers in the same pod. Within a
+pod, containers share `localhost`, so the dashboard reaches the gateway without
+network exposure beyond the pod.
+
+```text
+Pod:
+  Container A (gateway):   HERMES_MODE=gateway
+  Container B (dashboard): HERMES_MODE=dashboard
+                           HERMES_GATEWAY_URL=ws://localhost:9119
+```
 
 ## Initial deployment
 
