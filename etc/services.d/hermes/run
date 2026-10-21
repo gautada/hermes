@@ -67,8 +67,12 @@ case "${HERMES_MODE}" in
     DASHBOARD_PID=$!
 
     # Wait for either child to exit, then tear down the other.
-    wait -n 2>/dev/null || wait "${GATEWAY_PID}" "${DASHBOARD_PID}"
+    # POSIX sh has no wait -n; poll both PIDs instead.
+    while kill -0 "${GATEWAY_PID}" 2>/dev/null        && kill -0 "${DASHBOARD_PID}" 2>/dev/null; do
+      sleep 1
+    done
     kill "${GATEWAY_PID}" "${DASHBOARD_PID}" 2>/dev/null
+    wait
     exit 1
     ;;
 
