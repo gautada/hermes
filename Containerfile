@@ -60,28 +60,33 @@ RUN git submodule update --init --recursive \
 # ╭――――――――――――――――――╮
 # │ TIRITH           │
 # ╰――――――――――――――――――╯
-# Download the pre-built tirith binary for the target architecture. Source:
-# https://github.com/sheeki03/tirith (canonical, confirmed via tirith.sh).
-# SHA-256 checksums are pinned from the v0.4.2 checksums.txt release asset.
+# Build tirith from source to support any architecture without pre-built
+# binaries. Source: https://github.com/sheeki03/tirith
+# Requires the Rust toolchain; installed via rustup, then removed after the
+# build to keep the layer lean.
 ARG TIRITH_VERSION
-ARG TARGETARCH
-RUN set -e; \
-    case "${TARGETARCH}" in \
-      amd64) TIRITH_ARCH="x86_64-unknown-linux-gnu" \
-             TIRITH_SHA256="efa6bf414a83dba385d4f13137e8677f850ced9102fe74ebb14c72f31df0dc77" ;; \
-      arm64) TIRITH_ARCH="aarch64-unknown-linux-gnu" \
-             TIRITH_SHA256="c550b1bfb0c8c872ab3421cd6ef756f260f7cf4981a18cedd49f141fa2d77569" ;; \
-      *)     echo "Unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
-    esac; \
-    TIRITH_URL="https://github.com/sheeki03/tirith/releases/download/v${TIRITH_VERSION}/tirith-${TIRITH_ARCH}.tar.gz"; \
-    echo "Downloading tirith v${TIRITH_VERSION} for ${TIRITH_ARCH}..."; \
-    curl -fsSL "${TIRITH_URL}" -o /tmp/tirith.tar.gz \
- && echo "${TIRITH_SHA256}  /tmp/tirith.tar.gz" | sha256sum -c - \
- && tar -xzf /tmp/tirith.tar.gz -C /tmp \
-  && install -m 0755 /tmp/tirith /usr/local/bin/tirith \
- && install -m 0755 /tmp/tirith-package-approval-authority /usr/local/bin/tirith-package-approval-authority \
-  && rm -rf /tmp/tirith.tar.gz /tmp/tirith /tmp/tirith-package-approval-authority \
- && tirith --version
+ARG TIRITH_REPOSITORY=https://github.com/sheeki03/tirith.git
+# hadolint ignore=DL3008
+RUN apt-get update \
+ && apt-get install --yes --no-install-recommends pkg-config libssl-dev \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+ENV RUSTUP_HOME=/opt/rustup \
+    CARGO_HOME=/opt/cargo \
+    PATH="/opt/cargo/bin:${PATH}"
+# hadolint ignore=DL3003
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+      | sh -s -- -y --default-toolchain stable --profile minimal \
+ && git clone --branch "v${TIRITH_VERSION}" --depth 1 \
+      "${TIRITH_REPOSITORY}" /tmp/tirith-src \
+ && cd /tmp/tirith-src \
+ && cargo build --release --bin tirith --bin tirith-package-approval-authority \
+ && install -m 0755 target/release/tirith /usr/local/bin/tirith \
+ && install -m 0755 target/release/tirith-package-approval-authority \
+      /usr/local/bin/tirith-package-approval-authority \
+ && tirith --version \
+ && rm -rf /tmp/tirith-src "${RUSTUP_HOME}" "${CARGO_HOME}" \
+ && apt-get purge --yes --auto-remove pkg-config libssl-dev
 
 # ╭――――――――――――――――――――――――――――╮
 # │ FINAL                      │
@@ -149,17 +154,6 @@ RUN /opt/hermes/.venv/bin/python --version \
  && /opt/hermes/.venv/bin/hermes --help >/dev/null
 
 # ╭――――――――――――――――――╮
-# │ TIRITH           │
-# ╰――――――――――――――――――╯
-# Copy the pre-built tirith binary from the build stage. Placed on PATH so
-# Hermes finds it with the default security.tirith_path ("tirith").
-# Materialize shell hook files and seed the threat database into the image
-# layer so they are available on first boot without a network call.
-COPY --from=build /usr/local/bin/tirith /usr/local/bin/tirith
-COPY --from=build /usr/local/bin/tirith-package-approval-authority /usr/local/bin/tirith-package-approval-authority
-RUN tirith --version
-
-# ╭――――――――――――――――――╮
 # │ VERSION          │
 # ╰――――――――――――――――――╯
 # Override the base image's Debian version reporter with the application
@@ -173,8 +167,10 @@ RUN chmod 0755 /usr/bin/container-version
 COPY etc/services.d/hermes-gateway/run /etc/services.d/hermes-gateway/run
 RUN chmod 0755 /etc/services.d/hermes-gateway/run
 COPY etc/services.d/hermes-dashboard/run /etc/services.d/hermes-dashboard/run
-RUN chmod 0755 /etc/services.d/hermes-dashboard/run
-
+# Dashboard service is installed but NOT executable by default.  s6 skips
+# non-executable run scripts so the dashboard will not start unless
+# explicitly enabled (see gautada/hermes issue for env-var activation).
+RUN chmod 0644 /etc/services.d/hermes-dashboard/run
 
 # ╭――――――――――――――――――╮
 # │ PAPERCLIP        │
@@ -186,7 +182,9 @@ RUN chmod 0755 /etc/services.d/hermes-dashboard/run
 # hermes-specific analysis_incomplete override.
 COPY _local/bin/pcp-api.sh /home/${USER}/.local/bin/pcp-api.sh
 RUN chmod 0755 /home/${USER}/.local/bin/pcp-api.sh
-COPY etc/tirith/policy.yaml /home/${USER}/.config/tirith/policy.yaml
+RUN mkdir -p /home/${USER}/.config/tirith \
+ && ln -fsv /etc/tirith/policy.yaml /home/${USER}/.config/tirith/policy.yaml \
+ && chown -R ${USER}:${USER} /home/${USER}/.config/tirith
 # Tirith policy and rule validation is handled at runtime by the health.d
 # drop-in script (etc/health.d/tirith-check), exercised by container-test
 # in the CI test stage.
@@ -199,8 +197,17 @@ RUN mkdir -p /home/${USER}/.local/bin \
 ENV PATH="/home/${USER}/.local/bin:${PATH}"
 
 # ╭──────────────────────────╮
-# │ TIRITH SETUP             │
+# │ TIRITH                   │
 # ╰──────────────────────────╯
+# Copy the tirith binary built from source in the build stage. Placed on PATH so
+# Hermes finds it with the default security.tirith_path ("tirith").
+# COPY the default policy into the image so tirith works out of the box
+# (including CI).  At runtime a volume mount at /mnt/volumes/configuration
+# can overlay /etc/tirith/policy.yaml via the cont-init.d symlink pattern.
+COPY mnt/configuration/policy.yaml /etc/tirith/policy.yaml
+COPY --from=build /usr/local/bin/tirith /usr/local/bin/tirith
+COPY --from=build /usr/local/bin/tirith-package-approval-authority \
+                  /usr/local/bin/tirith-package-approval-authority
 # Materialize shell hooks, seed the threat database, and wire Claude Code.
 # HOME is set to the hermes user's home so XDG paths resolve correctly
 # while the build remains as root throughout (required for s6-svscan).
