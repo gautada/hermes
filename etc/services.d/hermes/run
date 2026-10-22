@@ -1,0 +1,83 @@
+#!/bin/sh
+exec 2>&1
+
+# ╭──────────────────────────────────────────────────────────────╮
+# │ Unified Hermes s6 service                                   │
+# │                                                              │
+# │ HERMES_MODE            gateway | dashboard | all             │
+# │                        (default: gateway)                    │
+# │                                                              │
+# │ HERMES_GATEWAY_URL     WebSocket URL the dashboard connects  │
+# │                        to (default: ws://localhost:9119)      │
+# │                                                              │
+# │ HERMES_DASHBOARD_HOST  Address the dashboard binds to        │
+# │                        (default: 0.0.0.0)                    │
+# │                                                              │
+# │ HERMES_DASHBOARD_PORT  Port the dashboard listens on         │
+# │                        (default: 8080)                       │
+# ╰──────────────────────────────────────────────────────────────╯
+
+APP_USER=$(id -nu 1000)
+HOME="/home/${APP_USER}"
+export HOME
+
+HERMES_WRITE_SAFE_ROOT="${HERMES_WRITE_SAFE_ROOT:-${HOME}/.hermes}"
+export HERMES_WRITE_SAFE_ROOT
+
+HERMES_MODE="${HERMES_MODE:-gateway}"
+HERMES_GATEWAY_URL="${HERMES_GATEWAY_URL:-ws://localhost:9119}"
+HERMES_DASHBOARD_HOST="${HERMES_DASHBOARD_HOST:-0.0.0.0}"
+HERMES_DASHBOARD_PORT="${HERMES_DASHBOARD_PORT:-8080}"
+
+HERMES_BIN="/opt/hermes/.venv/bin/hermes"
+
+case "${HERMES_MODE}" in
+  gateway)
+    exec s6-setuidgid "${APP_USER}" "${HERMES_BIN}" gateway run
+    ;;
+
+  dashboard)
+    exec s6-setuidgid "${APP_USER}" "${HERMES_BIN}" dashboard \
+      --host "${HERMES_DASHBOARD_HOST}" \
+      --port "${HERMES_DASHBOARD_PORT}" \
+      --gateway-url "${HERMES_GATEWAY_URL}"
+    ;;
+
+  all)
+    # Start the gateway in the background, then run the dashboard.
+    # If either dies, this script exits and s6 restarts everything.
+    s6-setuidgid "${APP_USER}" "${HERMES_BIN}" gateway run &
+    GATEWAY_PID=$!
+
+    trap 'kill ${GATEWAY_PID} 2>/dev/null; exit 1' INT TERM
+    # Give the gateway a moment to bind its port.
+    sleep 2
+
+    # If the gateway already exited, bail out so s6 restarts us.
+    if ! kill -0 "${GATEWAY_PID}" 2>/dev/null; then
+      echo "hermes: gateway exited prematurely" >&2
+      exit 1
+    fi
+
+    # Run the dashboard; if it exits we clean up.
+    s6-setuidgid "${APP_USER}" "${HERMES_BIN}" dashboard \
+      --host "${HERMES_DASHBOARD_HOST}" \
+      --port "${HERMES_DASHBOARD_PORT}" \
+      --gateway-url "${HERMES_GATEWAY_URL}" &
+    DASHBOARD_PID=$!
+
+    # Wait for either child to exit, then tear down the other.
+    # POSIX sh has no wait -n; poll both PIDs instead.
+    while kill -0 "${GATEWAY_PID}" 2>/dev/null        && kill -0 "${DASHBOARD_PID}" 2>/dev/null; do
+      sleep 1
+    done
+    kill "${GATEWAY_PID}" "${DASHBOARD_PID}" 2>/dev/null
+    wait
+    exit 1
+    ;;
+
+  *)
+    echo "hermes: unknown HERMES_MODE '${HERMES_MODE}' (expected: gateway, dashboard, all)" >&2
+    exit 1
+    ;;
+esac
