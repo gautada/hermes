@@ -240,5 +240,8 @@ COPY etc/health.d/tirith-check /etc/health.d/tirith-check
 RUN chmod 0755 /etc/health.d/tirith-check \
  && chown ${USER}:${USER} -R /home/${USER}
 
+ENV HERMES_WRITE_SAFE_ROOT=/home/${USER}/.hermes
+
 EXPOSE 8080
+EXPOSE 9119
 WORKDIR /home/hermes
